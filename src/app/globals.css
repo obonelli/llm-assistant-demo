@@ -1,26 +1,188 @@
 @import "tailwindcss";
 
+/* ===========================
+   Paleta base
+   =========================== */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-ink: #0B0B0F;
+  --color-noir: #0F1218;
+  --color-slate: #1A1F29;
+
+  --color-cyanFx: #19C8FF;
+  --color-violetFx: #7C3AED;
+  --color-magentaFx: #E84393;
+  --color-limeFx: #9BE15D;
+  --color-crimson: #DF1B3F;
+
+  --font-display: "Inter Tight", system-ui, sans-serif;
+  /* vars dinámicas de puntero */
+  --mx: .5;
+  --my: .5;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--color-ink);
+  --color-foreground: #ffffff;
+  --font-sans: var(--font-display);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ===========================
+   Dark mode por defecto
+   =========================== */
+:root {
+  color-scheme: dark;
 }
 
+/* ===========================
+   Fondo base
+   =========================== */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-ink);
+  color: var(--color-foreground);
+  font-family: var(--font-display);
+}
+
+/* Glows + fondo */
+.bg-tech {
+  /* 💡 Cambiado: fuera el cian, ahora morado + magenta suaves */
+  background:
+    radial-gradient(600px 300px at 70% 20%, rgba(124, 58, 237, .12), transparent 60%),
+    radial-gradient(500px 240px at 20% 70%, rgba(232, 67, 147, .10), transparent 60%),
+    linear-gradient(to bottom, rgba(0, 0, 0, .25), rgba(0, 0, 0, .6)),
+    var(--color-ink);
+  position: relative;
+}
+
+/* Rejilla base + parallax leve (sin dependencias del efecto) */
+.bg-tech::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, .045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, .045) 1px, transparent 1px);
+  background-size: 24px 24px;
+  transform: translate3d(calc((var(--mx, .5) - .5) * 12px), calc((var(--my, .5) - .5) * 12px), 0);
+  will-change: transform;
+}
+
+/* Sombra de “abolladura” suave al centro */
+.grid-dent {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background:
+    radial-gradient(350px 220px at 56% 42%, rgba(0, 0, 0, .24), transparent 70%),
+    radial-gradient(240px 160px at 44% 60%, rgba(0, 0, 0, .16), transparent 70%);
+}
+
+/* ===== Cyber utilities ===== */
+.scanlines {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: repeating-linear-gradient(to bottom,
+      rgba(255, 255, 255, .03) 0,
+      rgba(255, 255, 255, .03) 1px,
+      transparent 2px);
+  mix-blend-mode: overlay;
+  opacity: .35;
+}
+
+.holo-card {
+  background: rgba(15, 18, 24, .55);
+  border: 1px solid rgba(255, 255, 255, .08);
+  box-shadow:
+    inset 0 0 1px rgba(255, 255, 255, .4),
+    0 0 24px rgba(124, 58, 237, .08);
+}
+
+.holo-card:hover {
+  border-color: rgba(25, 200, 255, .35);
+  box-shadow:
+    0 0 12px rgba(25, 200, 255, .15),
+    0 0 64px rgba(124, 58, 237, .12);
+}
+
+.neon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(25, 200, 255, .4);
+  background: rgba(25, 200, 255, .15);
+  color: #fff;
+  border-radius: 12px;
+  box-shadow: 0 0 24px rgba(25, 200, 255, .25);
+  transition: .2s ease;
+  cursor: pointer;
+}
+
+/* ====== Pointer + Ship layer ====== */
+.pointer-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  /* sobre el fondo, debajo del UI */
+  pointer-events: none;
+  /* no bloquear interacción */
+}
+
+.pointer-trail {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  filter: blur(0.5px);
+}
+
+/* La nave (si usas esta clase en otra demo) */
+.cursor-ship {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 26px;
+  height: 26px;
+  margin-left: -13px;
+  /* pivot al centro */
+  margin-top: -13px;
+  transform: translate3d(50vw, 50vh, 0);
+  will-change: transform, filter;
+  background:
+    radial-gradient(10px 6px at 50% 80%, rgba(232, 67, 147, .6), transparent 70%),
+    linear-gradient(135deg, rgba(25, 200, 255, .9), rgba(124, 58, 237, .9));
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  box-shadow:
+    0 0 10px rgba(25, 200, 255, .45),
+    0 0 30px rgba(124, 58, 237, .35);
+}
+
+/* downwash suave que aumenta con --wash */
+.cursor-ship::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 26px;
+  height: 10px;
+  transform: translateX(-50%);
+  background: radial-gradient(18px 8px at 50% 20%, rgba(25, 200, 255, .45), transparent 70%);
+  filter: blur(var(--wash, 0px));
+  opacity: .7;
+  pointer-events: none;
+}
+
+/* subtle keyframes */
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: .45
+  }
+
+  50% {
+    opacity: .7
+  }
 }

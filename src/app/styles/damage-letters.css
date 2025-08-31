@@ -1,0 +1,187 @@
+/* ===== Contenedor: más separación (ya no pegadas) ===== */
+.destructible-wrap {
+    display: inline-flex;
+    flex-wrap: wrap;
+    column-gap: 0.16em;
+    row-gap: 0.08em;
+    align-items: flex-end;
+    line-height: 1.06;
+    letter-spacing: 0.002em;
+    position: relative;
+    z-index: 10;
+}
+
+.destructible-wrap .space {
+    display: inline-block;
+    width: 0.46em;
+}
+
+/* ===== Letras dañables ===== */
+.damageable-letter {
+    display: inline-block;
+    position: relative;
+
+    /* variables controladas por JS */
+    --d: 0;
+    --hx: 50%;
+    --hy: 50%;
+    --sx: 8;
+    --rotF: 12;
+    --fallDelay: 0ms;
+
+    transition:
+        transform .18s cubic-bezier(.22, .61, .22, .99),
+        opacity .18s cubic-bezier(.22, .61, .22, .99),
+        filter .18s cubic-bezier(.22, .61, .22, .99),
+        text-shadow .18s cubic-bezier(.22, .61, .22, .99);
+
+    opacity: calc(1 - var(--d) * .24);
+    transform:
+        translateY(calc(var(--d) * -1.6px)) rotate(calc(var(--d) * -1.2deg)) scale(calc(1 - var(--d) * 0.032));
+    filter:
+        saturate(calc(1 - var(--d) * .14)) brightness(calc(1 - var(--d) * .09)) blur(calc(var(--d) * .22px));
+    text-shadow:
+        0 0 calc(6px * var(--d)) rgba(124, 219, 255, .55),
+        0 0 calc(18px * var(--d)) rgba(124, 219, 255, .24);
+
+    -webkit-mask-image:
+        radial-gradient(18px at var(--hx) var(--hy),
+            rgba(0, 0, 0, 0) 0,
+            rgba(0, 0, 0, 0) calc(16px * var(--d)),
+            rgba(0, 0, 0, 1) calc(16px * var(--d) + 1px));
+    mask-image:
+        radial-gradient(18px at var(--hx) var(--hy),
+            rgba(0, 0, 0, 0) 0,
+            rgba(0, 0, 0, 0) calc(16px * var(--d)),
+            rgba(0, 0, 0, 1) calc(16px * var(--d) + 1px));
+}
+
+/* Flash + jitter al recibir impacto */
+.damageable-letter.hit {
+    animation: letter-hit 140ms ease-out;
+}
+
+@keyframes letter-hit {
+    0% {
+        transform: translate(0, 0) scale(1.02);
+        filter: brightness(1.15);
+    }
+
+    50% {
+        transform: translate(.5px, -.5px) rotate(-.4deg) scale(1.02);
+    }
+
+    100% {
+        transform: translate(0, 0) scale(1);
+        filter: brightness(1);
+    }
+}
+
+.damageable-letter.hit::after {
+    content: "";
+    position: absolute;
+    inset: -2px -3px;
+    pointer-events: none;
+    background: radial-gradient(18px 14px at var(--hx) var(--hy), rgba(124, 219, 255, .6), rgba(124, 219, 255, 0) 70%);
+    mix-blend-mode: screen;
+    filter: blur(2px);
+    opacity: .9;
+}
+
+/* Crack/luz sutil */
+.damageable-letter::after {
+    content: "";
+    position: absolute;
+    inset: -2px -3px;
+    pointer-events: none;
+    opacity: calc(var(--d) * .55);
+    mix-blend-mode: screen;
+    background:
+        radial-gradient(12px 10px at var(--hx) var(--hy), rgba(124, 219, 255, .35), rgba(124, 219, 255, 0) 70%),
+        conic-gradient(from 0deg at var(--hx) var(--hy),
+            rgba(124, 219, 255, .35),
+            rgba(124, 219, 255, 0) 24% 60%,
+            rgba(124, 219, 255, .35) 85%,
+            rgba(124, 219, 255, 0));
+    filter: blur(2px);
+}
+
+/* ===== Caída más smooth ===== */
+.damageable-letter.fall {
+    transition: none;
+    animation: letter-fall 1100ms cubic-bezier(.22, .8, .18, .99) var(--fallDelay) forwards,
+        letter-fade 1120ms linear var(--fallDelay) forwards;
+    will-change: transform, opacity, filter;
+    pointer-events: none;
+}
+
+@keyframes letter-fall {
+    0% {
+        transform: translate(0, 0) rotate(0deg) scale(1);
+        filter: blur(0);
+    }
+
+    30% {
+        transform: translate(calc(var(--sx) * .33px), 12px) rotate(calc(var(--rotF) * .28deg)) scale(1.015);
+    }
+
+    65% {
+        transform: translate(calc(var(--sx) * .7px), 30px) rotate(calc(var(--rotF) * .7deg)) scale(1.02);
+    }
+
+    100% {
+        transform: translate(calc(var(--sx) * 1px), 60px) rotate(calc(var(--rotF) * 1deg)) scale(1.025);
+        filter: blur(1px);
+    }
+}
+
+@keyframes letter-fade {
+    0% {
+        opacity: 1;
+    }
+
+    85% {
+        opacity: .85;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+.damageable-letter.gone {
+    display: none;
+}
+
+/* ===== Respawn aún más smooth y lento ===== */
+.damageable-letter.respawning {
+    /* más tiempo y easing más elástico-suave */
+    animation: letter-respawn 1400ms cubic-bezier(.16, .84, .14, 1) forwards;
+}
+
+@keyframes letter-respawn {
+    0% {
+        transform: translate(0, 38px) rotate(calc(var(--rotF) * .10deg)) scale(.985);
+        filter: blur(1.1px);
+        opacity: 0;
+    }
+
+    30% {
+        /* empieza con bastante suavidad */
+        opacity: .45;
+        transform: translate(0, 24px) rotate(calc(var(--rotF) * .06deg)) scale(.992);
+    }
+
+    70% {
+        /* fase de asentado, casi arriba */
+        opacity: .88;
+        transform: translate(0, 6px) rotate(calc(var(--rotF) * .02deg)) scale(.998);
+        filter: blur(.3px);
+    }
+
+    100% {
+        transform: translate(0, 0) rotate(0deg) scale(1);
+        filter: blur(0);
+        opacity: 1;
+    }
+}

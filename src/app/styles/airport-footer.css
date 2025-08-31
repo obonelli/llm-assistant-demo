@@ -1,0 +1,319 @@
+:root {
+    --airport-h: clamp(200px, 26vh, 360px);
+    --rim: 10px;
+    --rim-stroke: 2px;
+    --inner-pad: 12px;
+
+    /* línea central */
+    --centerline-top: 2%;
+    --centerline-bottom: 6%;
+}
+
+/* Footer fijo */
+.airport-footer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: var(--airport-h);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    width: 100%;
+    background: transparent;
+    isolation: isolate;
+    z-index: 20;
+    pointer-events: auto;
+}
+
+.airport-spacer {
+    width: 100%;
+}
+
+.airport-glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background:
+        radial-gradient(1200px 420px at 60% 35%, rgba(25, 200, 255, .08), transparent 70%),
+        radial-gradient(600px 260px at 30% 80%, rgba(100, 60, 220, .16), transparent 70%);
+    mix-blend-mode: screen;
+}
+
+/* Pista (base tipo pill; dejamos overflow hidden para recortar luces internas) */
+.runway {
+    --runway-r: 999px;
+    /* radio grande para bordes suaves por si alguna vez quitas la U */
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 8px;
+    width: 100%;
+    height: clamp(110px, 18vh, 160px);
+    background:
+        linear-gradient(#0B1620, #0B1620) padding-box,
+        linear-gradient(to right, rgba(255, 255, 255, .08), rgba(255, 255, 255, .06)) border-box;
+    border: 1px solid rgba(255, 255, 255, .06);
+    border-radius: var(--runway-r);
+    box-shadow:
+        0 40px 120px rgba(0, 0, 0, .6) inset,
+        0 16px 40px rgba(0, 0, 0, .35),
+        0 0 0 1px rgba(255, 255, 255, .04) inset;
+    z-index: 1;
+    overflow: hidden;
+}
+
+/* ===== Curva en U con clip-path =====
+   Variante con variables para que puedas subir/bajar rápido las esquinas */
+.runway--u.var {
+    --uBottom: 82%;
+    /* línea inferior recta (sube/baja toda la pista) */
+    --uTopR: 34%;
+    /* altura de inicio de la curva derecha (más bajo = sube más) */
+    --uTopL: 34%;
+    /* altura de inicio de la curva izquierda */
+
+    /* Path en porcentajes: recta abajo y curvas Bezier arriba */
+    -webkit-clip-path: path("M 0% var(--uBottom) L 100% var(--uBottom) L 100% var(--uTopR) C 96% 12%, 80% 10%, 60% 22% C 50% 27%, 50% 27%, 40% 22% C 20% 10%, 4% 12%, 0% var(--uTopL) Z");
+    clip-path: path("M 0% var(--uBottom) L 100% var(--uBottom) L 100% var(--uTopR) C 96% 12%, 80% 10%, 60% 22% C 50% 27%, 50% 27%, 40% 22% C 20% 10%, 4% 12%, 0% var(--uTopL) Z");
+}
+
+/* Delineado ámbar (sigue funcionando dentro del recorte) */
+.runway-edgeglow {
+    position: absolute;
+    inset: var(--rim) 0;
+    pointer-events: none;
+    border-radius: calc(var(--runway-r) - var(--rim));
+    background:
+        linear-gradient(to right, rgba(255, 200, 107, .58), rgba(255, 200, 107, .22)) top/100% var(--rim-stroke) no-repeat,
+        linear-gradient(to right, rgba(255, 200, 107, .58), rgba(255, 200, 107, .22)) bottom/100% var(--rim-stroke) no-repeat,
+        linear-gradient(to bottom, rgba(255, 200, 107, .58), rgba(255, 200, 107, .22)) left/var(--rim-stroke) 100% no-repeat,
+        linear-gradient(to bottom, rgba(255, 200, 107, .58), rgba(255, 200, 107, .22)) right/var(--rim-stroke) 100% no-repeat;
+    transition: box-shadow .25s ease, filter .25s ease, opacity .25s ease;
+}
+
+.runway.active .runway-edgeglow {
+    box-shadow:
+        inset 0 0 34px rgba(255, 210, 120, .38),
+        inset 0 0 14px rgba(255, 210, 120, .35),
+        0 0 24px rgba(255, 210, 120, .18);
+    filter: drop-shadow(0 0 6px rgba(255, 210, 120, .25));
+}
+
+/* Área útil */
+.runway-inset {
+    position: absolute;
+    inset: calc(var(--rim) + var(--rim-stroke));
+    overflow: hidden;
+    padding: var(--inner-pad);
+    pointer-events: auto;
+    border-radius: calc(var(--runway-r) - var(--rim) - var(--rim-stroke));
+}
+
+/* Centerline extendida (vertical central de tu layout; el clip la recorta arriba) */
+.runway-centerline {
+    position: absolute;
+    left: 50%;
+    top: calc(var(--centerline-top) + var(--inner-pad));
+    bottom: calc(var(--centerline-bottom) + var(--inner-pad));
+    width: 2px;
+    transform: translateX(-50%);
+    background: repeating-linear-gradient(to bottom,
+            rgba(180, 220, 255, .9) 0 14px,
+            transparent 14px 28px);
+    filter: drop-shadow(0 0 6px rgba(160, 230, 255, .55));
+    opacity: .85;
+}
+
+/* Luces azules */
+.edge {
+    position: absolute;
+    top: 5px;
+    bottom: 0;
+    width: 0;
+    pointer-events: none;
+    display: grid;
+    grid-auto-rows: 1fr;
+    align-content: space-between;
+}
+
+.edge-left {
+    left: 12px;
+}
+
+.edge-right {
+    right: 12px;
+}
+
+.edge-light {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    justify-self: center;
+    background: radial-gradient(circle, #9EEBFF, #19C8FF 60%, transparent 70%);
+    filter: drop-shadow(0 0 3px rgba(25, 200, 255, .7));
+    animation: twinkle 2.2s ease-in-out infinite;
+}
+
+/* atenuación natural + evitar acumulación en las puntas curvas */
+.edge-light:nth-child(odd) {
+    animation-delay: .9s;
+    opacity: .95;
+}
+
+/* suaviza extremos */
+.edge-left .edge-light:nth-child(-n+2),
+.edge-right .edge-light:nth-child(-n+2),
+.edge-left .edge-light:nth-last-child(-n+2),
+.edge-right .edge-light:nth-last-child(-n+2) {
+    opacity: .4;
+}
+
+@keyframes twinkle {
+
+    0%,
+    100% {
+        opacity: .65;
+        transform: scale(.9)
+    }
+
+    50% {
+        opacity: 1;
+        transform: scale(1.12)
+    }
+}
+
+/* ====== SOLO 2 HANGARES (lado izquierdo, más delgados) ====== */
+.hangarsL {
+    position: absolute;
+    left: 1.2%;
+    top: 8%;
+    height: 84%;
+    width: 22%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    pointer-events: none;
+}
+
+.hangar {
+    height: 24%;
+    border-radius: 10px;
+    background:
+        linear-gradient(180deg, rgba(20, 26, 36, .95), rgba(12, 16, 24, .95)) padding-box,
+        linear-gradient(180deg, rgba(124, 216, 255, .18), rgba(124, 216, 255, .04)) border-box;
+    border: 1px solid rgba(255, 255, 255, .06);
+    box-shadow: inset 0 0 20px rgba(124, 216, 255, .08), 0 10px 22px rgba(0, 0, 0, .35);
+    position: relative;
+    overflow: hidden;
+}
+
+.hangar::after {
+    content: "";
+    position: absolute;
+    inset: 6px 10px;
+    border-radius: 8px;
+    background:
+        repeating-linear-gradient(90deg, rgba(124, 216, 255, .32) 0 2px, transparent 2px 8px),
+        linear-gradient(180deg, rgba(124, 216, 255, .07), transparent);
+    opacity: .95;
+}
+
+.hangar.is-near::after {
+    background:
+        repeating-linear-gradient(90deg, rgba(206, 109, 255, .95) 0 3px, rgba(206, 109, 255, .12) 3px 9px),
+        linear-gradient(180deg, rgba(206, 109, 255, .22), transparent);
+    filter: drop-shadow(0 0 10px rgba(206, 109, 255, .6));
+}
+
+/* === Flechas guía (chase) === */
+.guidance {
+    position: absolute;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    pointer-events: none;
+    gap: 0;
+    opacity: .3;
+    transition: opacity .25s ease;
+}
+
+.runway.active .guidance {
+    opacity: 1;
+}
+
+/* Abajo (derecha) → */
+.guidance--right {
+    left: 58%;
+    right: 2.5%;
+    bottom: 22%;
+}
+
+/* Arriba (derecha) ← */
+.guidance--left {
+    top: 22%;
+    left: 58%;
+    right: 2.5%;
+}
+
+.arrow {
+    display: inline-flex;
+    align-items: center;
+    opacity: .25;
+    transform-origin: center;
+    animation: arrow-chase 1.4s ease-in-out infinite;
+    animation-delay: calc(var(--i) * 0.12s);
+    animation-play-state: paused;
+}
+
+.runway.active .arrow {
+    animation-play-state: running;
+}
+
+.arrow--left {
+    transform: rotate(180deg);
+    animation-delay: calc((var(--n) - var(--i)) * 0.12s);
+}
+
+@keyframes arrow-chase {
+    0% {
+        opacity: .2;
+        transform: translateX(0) rotate(var(--rot, 0deg));
+    }
+
+    35% {
+        opacity: 1;
+        transform: translateX(3px) rotate(var(--rot, 0deg));
+        filter: drop-shadow(0 0 8px rgba(124, 216, 255, .6));
+    }
+
+    60% {
+        opacity: .65;
+        transform: translateX(1px) rotate(var(--rot, 0deg));
+    }
+
+    100% {
+        opacity: .2;
+        transform: translateX(0) rotate(var(--rot, 0deg));
+    }
+}
+
+@media (max-width:640px) {
+    .guidance--right {
+        left: 55%;
+    }
+
+    .guidance--left {
+        left: 55%;
+    }
+
+    .guidance .arrow:nth-last-child(-n+6) {
+        display: none;
+    }
+
+    .hangarsL {
+        width: 26%;
+        left: 1.2%;
+        top: 9%;
+        height: 82%;
+    }
+}

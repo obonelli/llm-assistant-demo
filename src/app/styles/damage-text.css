@@ -1,0 +1,41 @@
+.destructible-wrap {
+    position: relative;
+    width: 100%;
+    height: clamp(120px, 22vw, 200px);
+    pointer-events: none;
+    /* el texto no “bloquea” el ratón */
+    filter: drop-shadow(0 6px 30px rgba(25, 200, 255, .12));
+}
+
+.destructible-wrap.is-ready {
+    /* leve glow “general” */
+    text-shadow: 0 0 18px rgba(25, 200, 255, .28);
+}
+
+.destructible-wrap canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.destructible-text {
+    z-index: 2;
+    image-rendering: optimizeQuality;
+}
+
+.destructible-sparks {
+    z-index: 3;
+    pointer-events: none;
+    mix-blend-mode: screen;
+}
+
+.destructible-mask {
+    display: none;
+    /* solo buffer de máscara */
+}
+
+/* Parrafito debajo no cambia, pero puedes añadir un glow sutil */
+.hero-sub {
+    text-shadow: 0 0 8px rgba(25, 200, 255, .12);
+}
