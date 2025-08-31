@@ -1,15 +1,19 @@
 "use client";
 
-import Navbar from "@/app/components/Navbar";
 import PointerFX from "@/app/components/PointerFX";
 import CursorShip from "@/app/components/CursorShip";
 import DestructibleTitle from "@/app/components/DestructibleTitle";
 import Wingman from "@/app/components/Wingman";
+import WingmanPrompt from "@/app/components/WingmanPrompt";
 
 export default function HomePage() {
   return (
     <main className="relative min-h-screen bg-tech overflow-hidden isolate">
-      <Navbar />
+      <WingmanPrompt
+        prompt="Eres un copiloto táctico profesional. Habla poco, en español neutro,
+        tono calmado y útil. Solo 'say' cuando aporte algo: máximo 1 frase corta."
+      />
+      {/* Navbar viene del layout */}
       <PointerFX />
       <CursorShip />
       <Wingman />
@@ -37,10 +41,7 @@ export default function HomePage() {
 
         <div className="mt-14 grid grid-cols-1 sm:grid-cols-3 gap-4 text-left">
           {[
-            {
-              k: "SSR/ISR",
-              d: "SEO + speed with App Router and smart caching.",
-            },
+            { k: "SSR/ISR", d: "SEO + speed with App Router and smart caching." },
             { k: "UI System", d: "MUI + Tailwind, dark theme and pro components." },
             { k: "AI-ready", d: "Future integration with Vercel AI / OpenAI." },
           ].map((f) => (

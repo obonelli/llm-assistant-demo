@@ -1,0 +1,45 @@
+.container {
+    padding: 32px 24px;
+    max-width: 980px;
+    margin: 0 auto;
+}
+
+.toolbar {
+    display: flex;
+    gap: 8px;
+    margin: 12px 0 20px;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+}
+
+.card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 14px;
+    border-radius: 10px;
+}
+
+.card.big {
+    padding: 18px;
+}
+
+.row {
+    display: flex;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.muted {
+    opacity: .7;
+}
+
+.ai-highlight {
+    outline: 3px solid #7c3aed;
+    box-shadow: 0 0 0 6px rgba(124, 58, 237, .2);
+    border-radius: 8px;
+    transition: outline .2s;
+}

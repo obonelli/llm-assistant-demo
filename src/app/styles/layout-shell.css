@@ -1,0 +1,31 @@
+/* src/app/styles/layout-shell.css */
+
+/* Altura del navbar */
+:root {
+    --nav-h: 64px;
+}
+
+@media (min-width: 640px) {
+    :root {
+        --nav-h: 72px;
+    }
+}
+
+/* Wrapper sticky del navbar (sin borde para evitar “doble línea”) */
+.app-navbar {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    height: var(--nav-h);
+    display: flex;
+    align-items: center;
+    backdrop-filter: blur(8px);
+    /* Fondo sutil sin borde */
+    background: linear-gradient(to bottom, rgba(11, 15, 20, .92), rgba(11, 15, 20, .78));
+    /* border-bottom: 1px solid rgba(255,255,255,.06);  <-- removido */
+}
+
+/* Offset global del contenido */
+.page-shell {
+    padding-top: var(--nav-h);
+}

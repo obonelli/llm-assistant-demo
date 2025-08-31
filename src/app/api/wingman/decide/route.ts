@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-/** Tipos de entrada/salida (simple) */
+/** I/O types */
 type Snapshot = {
     time: number;
     dims: { width: number; height: number };
     player: { x: number; y: number; heading: number; vx: number; vy: number; firing?: boolean };
     wingman: { x: number; y: number; heading: number; mode: string };
-    enemies: Array<{ id: string; x: number; y: number; vx: number; vy: number; size?: number; visible?: boolean; threat?: number }>;
+    enemies: Array<{ id: string; x: number; y: number; vx?: number; vy?: number; size?: number; visible?: boolean; threat?: number }>;
+    prompt?: string; // optional, overrides style/voice if provided
 };
 
 type Action =
@@ -27,29 +28,31 @@ export async function POST(req: NextRequest) {
 
     const snap = (await req.json()) as Snapshot;
 
-    // Prompt muy concreto + JSON estricto
+    // ---- Base system prompt (EN) + optional runtime style override ----
+    const style = (snap.prompt || "").trim();
     const system = `
-Eres el "cerebro táctico" de un wingman en un minijuego 2D.
-Respondes SOLO con JSON válido, sin texto extra, con el shape:
+You are the "tactical brain" of a wingman in a 2D mini-game.
+You must reply ONLY with valid JSON (no extra text) of the form:
 { "actions": [ ... ] }
 
-Reglas:
-- Mantén al wingman útil pero seguro.
-- Si no hay enemigos, alterna entre "patrol" (delante/detrás del jugador) y "escort".
-- Si hay enemigo visible cerca, "engage": decide "move_to" hacia un punto razonable (sin salir del mapa) y "fire_burst".
-- No inundes de órdenes: 1-3 acciones por llamada.
-- Coordenadas dentro de (0..width, 0..height).
-- Si el jugador dejó de disparar por mucho tiempo, puedes recomendar "despawn".
-- Frases cortas y poco frecuentes con "say".
-- "fire_burst": usa "cadence_ms" 120–240 y "duration_ms" 400–1600. "spread" 0–0.05.
-- Si no tienes nada mejor, devuelve { "actions": [] }.
+Style/voice${style ? ` (runtime override provided below)` : ""}:
+${style || `Short, professional radio chatter in ENGLISH.
+Keep messages varied across calls. 2–5 words, no punctuation if possible.
+Examples (just style, do NOT copy every time): On your six | Covering left | Bandit spotted | Reloading | Pushing up | Holding high.`}
+
+Rules:
+- Keep the wingman useful but safe.
+- If there are no visible enemies, alternate between "patrol" and "escort".
+- If a visible enemy is near: "engage" and include exactly 1 "move_to" (on-screen coords) and 1 "fire_burst".
+- Do NOT flood orders: return 1–3 actions per call.
+- "fire_burst": cadence_ms 120–240, duration_ms 400–1600, spread 0–0.05.
+- "say": English, short, at most 1 per response; VARY wording over time.
+- If nothing relevant, return { "actions": [] }.
 `;
 
-    const user = JSON.stringify({
-        snapshot: snap,
-    });
+    const user = JSON.stringify({ snapshot: snap });
 
-    // Llamada HTTP directa a Chat Completions con JSON mode
+    // Chat Completions in JSON mode
     const r = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -58,7 +61,7 @@ Reglas:
         },
         body: JSON.stringify({
             model: "gpt-4o-mini",
-            temperature: 0.6,
+            temperature: 0.9,                 // a little more randomness for varied lines
             response_format: { type: "json_object" },
             messages: [
                 { role: "system", content: system },
@@ -68,7 +71,6 @@ Reglas:
     });
 
     if (!r.ok) {
-        // en caso de fallo, devolvemos sin acciones
         return NextResponse.json({ actions: [] } as Decision, { status: 200 });
     }
 
