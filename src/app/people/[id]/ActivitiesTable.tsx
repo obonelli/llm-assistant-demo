@@ -105,7 +105,17 @@ export default function ActivitiesTable() {
                                     />
                                 </td>
                                 <td className="px-2 py-1.5">
-                                    <select value={r.kind ?? ""} onChange={(e) => update(i, "kind", (e.target.value || undefined) as any)} className="rounded border border-white/10 bg-white/5 px-2 py-1 outline-none">
+                                    <select
+                                        value={r.kind ?? ""}
+                                        onChange={(e) =>
+                                            update(
+                                                i,
+                                                "kind",
+                                                (e.target.value === "" ? undefined : e.target.value) as Activity["kind"]
+                                            )
+                                        }
+                                        className="rounded border border-white/10 bg-white/5 px-2 py-1 outline-none"
+                                    >
                                         <option value="">—</option>
                                         <option value="debit">debit</option>
                                         <option value="credit">credit</option>

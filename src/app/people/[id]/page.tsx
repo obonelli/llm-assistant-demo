@@ -13,7 +13,7 @@ export default async function PersonDetail({
     const { id } = await params;
 
     // Compare as strings to be safe
-    const p = PEOPLE.find((x: any) => String(x.id) === String(id));
+    const p = PEOPLE.find((x) => String(x.id) === String(id));
 
     if (!p) {
         return (

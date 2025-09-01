@@ -8,6 +8,7 @@ import "@/app/styles/layout-shell.css";
 import { Inter_Tight } from "next/font/google";
 import Navbar from "@/app/components/Navbar";
 import Assistant from "@/app/components/Assistant";
+import { Suspense } from "react";
 
 const inter = Inter_Tight({ subsets: ["latin"], variable: "--font-display" });
 
@@ -18,7 +19,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={inter.variable}>
       <body className="bg-ink text-white antialiased">
         <div className="app-navbar">
-          <Navbar />
+          <Suspense fallback={null}>
+            <Navbar />
+          </Suspense>
         </div>
         <div className="page-shell">{children}</div>
         <Assistant />

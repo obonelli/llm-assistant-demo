@@ -1,6 +1,6 @@
-// src/app/analytics/page.tsx
 "use client";
 
+import { Suspense } from "react";
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PEOPLE } from "@/mock/people";
@@ -19,7 +19,7 @@ type Row = {
 
 type ActivityRow = {
     personId: string;
-    date: string; // ISO yyyy-mm-dd
+    date: string;
     action: string;
     notes?: string;
     amount?: number;
@@ -27,7 +27,6 @@ type ActivityRow = {
 };
 
 function parseDate(s: string) {
-    // soporta yyyy-mm-dd, dd/mm/yyyy, dd-mm-yyyy, “junio 2024”
     s = s.trim().toLowerCase();
     const m1 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (m1) return new Date(`${m1[1]}-${m1[2]}-${m1[3]}T00:00:00`);
@@ -35,38 +34,19 @@ function parseDate(s: string) {
     if (m2) return new Date(`${m2[3]}-${m2[2]}-${m2[1]}T00:00:00`);
 
     const meses = [
-        "enero",
-        "febrero",
-        "marzo",
-        "abril",
-        "mayo",
-        "junio",
-        "julio",
-        "agosto",
-        "septiembre",
-        "octubre",
-        "noviembre",
-        "diciembre",
+        "enero", "febrero", "marzo", "abril", "mayo", "junio",
+        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
     ];
     const mm = meses.findIndex((m) => s.includes(m));
     const y = s.match(/\b(20\d{2})\b/);
-    if (mm >= 0 && y)
-        return new Date(
-            `${y[1]}-${String(mm + 1).padStart(2, "0")}-01T00:00:00`
-        );
+    if (mm >= 0 && y) {
+        return new Date(`${y[1]}-${String(mm + 1).padStart(2, "0")}-01T00:00:00`);
+    }
     return null;
 }
 
 function downloadCSV(filename: string, rows: Row[]) {
-    const headers = [
-        "Person",
-        "Count",
-        "Debit",
-        "Credit",
-        "Balance",
-        "FirstDate",
-        "LastDate",
-    ];
+    const headers = ["Person", "Count", "Debit", "Credit", "Balance", "FirstDate", "LastDate"];
     const lines = [
         headers.join(","),
         ...rows.map((r) =>
@@ -97,7 +77,7 @@ function normalize(s: string) {
         .replace(/[\u0300-\u036f]/g, "");
 }
 
-export default function AnalyticsPage() {
+function AnalyticsContent() {
     const sp = useSearchParams();
     const initialAsk = sp.get("ask") ?? "";
     const [ask, setAsk] = useState(initialAsk);
@@ -108,16 +88,13 @@ export default function AnalyticsPage() {
         return m;
     }, []);
 
-    /** Parser mínimo de NL en español para la demo */
     const parsed = useMemo(() => {
         const q = normalize(ask);
 
-        // top N
         let topN = 0;
         const mTop = q.match(/\btop\s+(\d{1,3})\b/);
         if (mTop) topN = parseInt(mTop[1], 10);
 
-        // personas mencionadas (por nombre o email)
         const personMatches: string[] = [];
         for (const p of PEOPLE) {
             const n = normalize(p.name);
@@ -125,9 +102,7 @@ export default function AnalyticsPage() {
             else if (p.email && q.includes(normalize(p.email))) personMatches.push(p.id);
         }
 
-        // fechas: "entre X y Y" o “desde X hasta Y”
-        let from: Date | null = null,
-            to: Date | null = null;
+        let from: Date | null = null, to: Date | null = null;
         const mEntre = q.match(
             /\b(entre|desde)\s+([^\s]+(?:\s+\w+)?(?:\s+\d{4})?)\s+(y|hasta)\s+([^\s]+(?:\s+\w+)?(?:\s+\d{4})?)/
         );
@@ -135,20 +110,18 @@ export default function AnalyticsPage() {
             from = parseDate(mEntre[2]) || null;
             to = parseDate(mEntre[4]) || null;
         } else {
-            // “de enero 2024”, “en junio 2024”
             const mMes = q.match(/\b(de|en)\s+([a-záéíóú]+(?:\s+\d{4})?)\b/);
             if (mMes) {
                 from = parseDate(mMes[2]) || null;
                 if (from) {
                     const t = new Date(from);
                     t.setMonth(t.getMonth() + 1);
-                    t.setDate(0); // último día del mes
+                    t.setDate(0);
                     to = t;
                 }
             }
         }
 
-        // tipo de métrica: balance/debit/credit
         const wantBalance = /\b(balance|saldo|saldos)\b/.test(q);
         const wantDebit = /\b(debito|debito?s|cargo?s)\b/.test(q);
         const wantCredit = /\b(credito|credito?s|abono?s)\b/.test(q);
@@ -156,7 +129,6 @@ export default function AnalyticsPage() {
         return { topN, personMatches, from, to, wantBalance, wantDebit, wantCredit };
     }, [ask]);
 
-    /** Agregación */
     const rows = useMemo<Row[]>(() => {
         const fromTime = parsed.from?.getTime() ?? -Infinity;
         const toTime = parsed.to?.getTime() ?? Infinity;
@@ -187,14 +159,10 @@ export default function AnalyticsPage() {
 
             base.count += 1;
 
-            // Si tu mock trae montos/kind, los usamos. Si no, cuenta = "peso"
             const amt = typeof a.amount === "number" ? a.amount : 1;
             if (a.kind === "debit") base.debit += amt;
             else if (a.kind === "credit") base.credit += amt;
-            else {
-                // sin kind ⇒ lo sumamos al balance como +1 (simboliza actividad)
-                base.balance += amt;
-            }
+            else base.balance += amt;
 
             const d = a.date;
             if (!base.firstDate || d < base.firstDate) base.firstDate = d;
@@ -203,7 +171,6 @@ export default function AnalyticsPage() {
             grouped[key] = base;
         }
 
-        // balance = credit - debit + balance (si hubo actividades sin kind)
         for (const k of Object.keys(grouped)) {
             const r = grouped[k];
             r.balance = r.credit - r.debit + r.balance;
@@ -211,7 +178,6 @@ export default function AnalyticsPage() {
 
         let arr = Object.values(grouped);
 
-        // Orden básico según intención
         if (parsed.wantDebit) arr.sort((a, b) => b.debit - a.debit);
         else if (parsed.wantCredit) arr.sort((a, b) => b.credit - a.credit);
         else arr.sort((a, b) => b.balance - a.balance);
@@ -239,9 +205,7 @@ export default function AnalyticsPage() {
                     placeholder="Ej: top 5 deudores entre 2024-06-01 y 2024-07-31"
                 />
                 <button
-                    onClick={() => {
-                        /* recalcula solo con useMemo */
-                    }}
+                    onClick={() => { }}
                     className="rounded-lg border border-white/10 bg-white/8 px-3 py-2 hover:bg-white/10"
                 >
                     Run
@@ -279,15 +243,9 @@ export default function AnalyticsPage() {
                             <tr key={r.personId} className="odd:bg-white/[.03]">
                                 <td className="px-3 py-2">{r.person}</td>
                                 <td className="px-3 py-2 text-right">{r.count}</td>
-                                <td className="px-3 py-2 text-right">
-                                    {r.debit.toFixed(2)}
-                                </td>
-                                <td className="px-3 py-2 text-right">
-                                    {r.credit.toFixed(2)}
-                                </td>
-                                <td className="px-3 py-2 text-right">
-                                    {r.balance.toFixed(2)}
-                                </td>
+                                <td className="px-3 py-2 text-right">{r.debit.toFixed(2)}</td>
+                                <td className="px-3 py-2 text-right">{r.credit.toFixed(2)}</td>
+                                <td className="px-3 py-2 text-right">{r.balance.toFixed(2)}</td>
                                 <td className="px-3 py-2">{r.firstDate ?? ""}</td>
                                 <td className="px-3 py-2">{r.lastDate ?? ""}</td>
                             </tr>
@@ -302,5 +260,13 @@ export default function AnalyticsPage() {
                 cada actividad cuenta como 1.
             </p>
         </main>
+    );
+}
+
+export default function AnalyticsPage() {
+    return (
+        <Suspense fallback={<p className="p-4">Loading analytics…</p>}>
+            <AnalyticsContent />
+        </Suspense>
     );
 }
