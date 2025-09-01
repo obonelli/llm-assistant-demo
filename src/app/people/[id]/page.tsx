@@ -3,14 +3,25 @@ import Link from "next/link";
 import { PEOPLE } from "@/mock/people";
 import ActivitiesTable from "./ActivitiesTable";
 
-export default async function PersonDetail({ params }: { params: { id: string } }) {
-    const p = PEOPLE.find((x) => x.id === params.id);
-    if (!p)
+type RouteParams = { id: string };
+
+export default async function PersonDetail({
+    params,
+}: {
+    params: Promise<RouteParams>;
+}) {
+    const { id } = await params;
+
+    // Compare as strings to be safe
+    const p = PEOPLE.find((x: any) => String(x.id) === String(id));
+
+    if (!p) {
         return (
             <main className="container">
                 <p>Not found.</p>
             </main>
         );
+    }
 
     return (
         <main className="container">
