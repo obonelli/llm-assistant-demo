@@ -1,3 +1,4 @@
+// ./src/app/components/PeopleTable.tsx
 "use client";
 
 import { useMemo, useState, useEffect, useRef } from "react";
@@ -18,6 +19,13 @@ type ActivityRow = {
     account?: string;
     category?: string;
     ref?: string;
+};
+
+// Persona con totales calculados para la tabla
+type WithTotals = Person & {
+    _debit: number;
+    _credit: number;
+    _balance: number;
 };
 
 export default function PeopleTable({ initialPeople }: Props) {
@@ -67,7 +75,7 @@ export default function PeopleTable({ initialPeople }: Props) {
         return res;
     }, [byId, from, to]);
 
-    const filtered = useMemo(() => {
+    const filtered: WithTotals[] = useMemo(() => {
         let r = rows;
         if (debouncedQ) {
             r = r.filter((p) => {
@@ -75,12 +83,13 @@ export default function PeopleTable({ initialPeople }: Props) {
                 return hay.includes(debouncedQ);
             });
         }
-        const withTotals = r.map((p) => {
+        const withTotals: WithTotals[] = r.map((p) => {
             const agg = aggregates.get(p.id) || { debit: 0, credit: 0, balance: 0 };
             return { ...p, _debit: agg.debit, _credit: agg.credit, _balance: agg.balance };
         });
+
         withTotals.sort((a, b) => {
-            const pick = (x: any) => {
+            const pick = (x: WithTotals): string | number => {
                 if (sortKey === "debit") return x._debit;
                 if (sortKey === "credit") return x._credit;
                 if (sortKey === "balance") return x._balance;
@@ -93,6 +102,7 @@ export default function PeopleTable({ initialPeople }: Props) {
             if (av > bv) return asc ? 1 : -1;
             return 0;
         });
+
         return withTotals;
     }, [rows, debouncedQ, sortKey, asc, aggregates]);
 
@@ -100,7 +110,7 @@ export default function PeopleTable({ initialPeople }: Props) {
     useEffect(() => {
         const el = allCheckboxRef.current;
         if (!el) return;
-        const allChecked = filtered.length > 0 && filtered.every((p: any) => selected.has(p.id));
+        const allChecked = filtered.length > 0 && filtered.every((p) => selected.has(p.id));
         const some = selected.size > 0 && !allChecked;
         el.indeterminate = some;
         el.checked = allChecked;
@@ -115,7 +125,7 @@ export default function PeopleTable({ initialPeople }: Props) {
     };
 
     const toggleAll = (on: boolean) => {
-        if (on) setSelected(new Set(filtered.map((p: any) => p.id)));
+        if (on) setSelected(new Set(filtered.map((p) => p.id)));
         else setSelected(new Set());
     };
 
@@ -130,12 +140,20 @@ export default function PeopleTable({ initialPeople }: Props) {
 
     // ===== Exportar a Excel (.xlsx)
     const exportExcel = () => {
-        const pick = filtered.filter((p: any) => selected.has(p.id));
-        const list = (pick.length ? pick : filtered) as any[];
+        const pick = filtered.filter((p) => selected.has(p.id));
+        const list: WithTotals[] = pick.length ? pick : filtered;
 
-        const aoa = [
+        const aoa: (string | number)[][] = [
             ["Name", "Email", "Company", "Role", "Debit", "Credit", "Balance"],
-            ...list.map((p) => [p.name, p.email, p.company, p.role, +p._debit || 0, +p._credit || 0, +p._balance || 0]),
+            ...list.map((p) => [
+                p.name,
+                p.email,
+                p.company,
+                p.role,
+                +p._debit || 0,
+                +p._credit || 0,
+                +p._balance || 0,
+            ]),
         ];
 
         const totalDebit = list.reduce((acc, p) => acc + (+p._debit || 0), 0);
@@ -216,7 +234,12 @@ export default function PeopleTable({ initialPeople }: Props) {
                     <thead className="text-left text-white/70">
                         <tr>
                             <th className="px-3 py-2">
-                                <input ref={allCheckboxRef} type="checkbox" aria-label="Select all" onChange={(e) => toggleAll(e.target.checked)} />
+                                <input
+                                    ref={allCheckboxRef}
+                                    type="checkbox"
+                                    aria-label="Select all"
+                                    onChange={(e) => toggleAll(e.target.checked)}
+                                />
                             </th>
                             <Th label="Name" k="name" sortKey={sortKey} asc={asc} onClick={toggleSort} />
                             <Th label="Email" k="email" sortKey={sortKey} asc={asc} onClick={toggleSort} />
@@ -235,13 +258,18 @@ export default function PeopleTable({ initialPeople }: Props) {
                                 </td>
                             </tr>
                         )}
-                        {filtered.map((p: any) => {
+                        {filtered.map((p) => {
                             const isEditingCompany = editing.id === p.id && editing.field === "company";
                             const isEditingRole = editing.id === p.id && editing.field === "role";
                             return (
                                 <tr key={p.id} className="border-t border-white/10 hover:bg-white/5">
                                     <td className="px-3 py-2">
-                                        <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleOne(p.id)} aria-label={`Select ${p.name}`} />
+                                        <input
+                                            type="checkbox"
+                                            checked={selected.has(p.id)}
+                                            onChange={() => toggleOne(p.id)}
+                                            aria-label={`Select ${p.name}`}
+                                        />
                                     </td>
                                     <td className="px-3 py-2">{p.name}</td>
                                     <td className="px-3 py-2 text-white/80">{p.email}</td>
@@ -320,7 +348,7 @@ function Th({
 }: {
     label: string;
     k: SortKey;
-    sortKey: string;
+    sortKey: SortKey;
     asc: boolean;
     onClick: (k: SortKey) => void;
 }) {

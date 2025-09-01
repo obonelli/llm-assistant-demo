@@ -1,5 +1,6 @@
+// ./src/app/components/Wingman.tsx
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { LASER_SPEED, LASER_INHERIT_SHIP_VEL } from "./cursor/constants";
 import { clamp } from "./cursor/math";
 
@@ -22,6 +23,27 @@ const OFFSET_Y = -80;
 const POLL_MS = 800; // intervalo del /decide
 
 type Mode = "escort" | "patrol" | "engage" | "evade";
+
+// Acciones que la IA puede devolver
+type WingmanAction =
+    | { type: "say"; text: string }
+    | { type: "set_mode"; mode: Mode }
+    | { type: "move_to"; x: number; y: number }
+    | { type: "fire_burst"; cadence_ms?: number; duration_ms?: number; spread?: number }
+    | {
+        type: "engage";
+        move_to?: { x: number; y: number };
+        fire_burst?: { cadence_ms?: number; duration_ms?: number; spread?: number };
+    }
+    | { type: "despawn" };
+
+type ShipStateDetail = Partial<{
+    x: number;
+    y: number;
+    heading: number;
+    vx: number;
+    vy: number;
+}>;
 
 export default function Wingman() {
     const [active, setActive] = useState(false);
@@ -62,11 +84,11 @@ export default function Wingman() {
     );
 
     const phraseTimeout = useRef<number | null>(null);
-    const sayBubble = (text: string, ms = 1200) => {
+    const sayBubble = useCallback((text: string, ms = 1200) => {
         setPhrase(text);
         if (phraseTimeout.current) window.clearTimeout(phraseTimeout.current);
         phraseTimeout.current = window.setTimeout(() => setPhrase(null), ms);
-    };
+    }, []);
 
     // ====== VOZ (SpeechSynthesis) ======
     const ttsEnabledRef = useRef(true);
@@ -77,7 +99,6 @@ export default function Wingman() {
     const lastSpokenAtRef = useRef(0);
     const MIN_TTS_COOLDOWN_MS = 1400; // anti-spam
 
-    // Inglés (en-US → en-GB → cualquier en*)
     const pickEnglishVoice = (): SpeechSynthesisVoice | null => {
         const synth = window.speechSynthesis;
         const voices: SpeechSynthesisVoice[] = synth.getVoices();
@@ -100,41 +121,29 @@ export default function Wingman() {
             u.volume = 0;
             window.speechSynthesis.speak(u);
             ttsReadyRef.current = true;
-        } catch { /* ignore */ }
+        } catch {
+            /* ignore */
+        }
     };
 
-    const ensureVoiceLoaded = () => {
-        try {
-            const v = pickEnglishVoice();
-            if (v) {
-                voiceRef.current = v;
-            } else {
-                window.speechSynthesis.onvoiceschanged = function (_e: Event) {
-                    voiceRef.current = pickEnglishVoice();
-                    processTTSQueue();
-                };
-            }
-        } catch { /* ignore */ }
-    };
-
-    const enqueueTTS = (text: string) => {
-        if (!ttsEnabledRef.current) return;
-        const now = performance.now();
-        if (now - lastSpokenAtRef.current < MIN_TTS_COOLDOWN_MS) return;
-        const last = ttsQueueRef.current.at(-1);
-        if (last === text) return; // evita duplicado inmediato
-        ttsQueueRef.current.push(text);
-        processTTSQueue();
-    };
-
-    const processTTSQueue = () => {
+    const processTTSQueue = useCallback(() => {
         if (!ttsEnabledRef.current || ttsSpeakingRef.current) return;
         const next = ttsQueueRef.current.shift();
         if (!next) return;
 
         try {
             warmupTTS();
-            ensureVoiceLoaded();
+
+            // 🔽 mover aquí el contenido de ensureVoiceLoaded
+            const v = pickEnglishVoice();
+            if (v) {
+                voiceRef.current = v;
+            } else {
+                window.speechSynthesis.onvoiceschanged = () => {
+                    voiceRef.current = pickEnglishVoice();
+                    processTTSQueue();
+                };
+            }
 
             const u = new SpeechSynthesisUtterance(next);
             if (voiceRef.current) u.voice = voiceRef.current;
@@ -148,64 +157,61 @@ export default function Wingman() {
                 lastSpokenAtRef.current = performance.now();
                 processTTSQueue();
             };
-            u.onerror = () => { ttsSpeakingRef.current = false; };
+            u.onerror = () => {
+                ttsSpeakingRef.current = false;
+            };
 
             window.speechSynthesis.speak(u);
-        } catch { /* ignore */ }
-    };
+        } catch {
+            /* ignore */
+        }
+    }, []);
+
+    const enqueueTTS = useCallback(
+        (text: string) => {
+            if (!ttsEnabledRef.current) return;
+            const now = performance.now();
+            if (now - lastSpokenAtRef.current < MIN_TTS_COOLDOWN_MS) return;
+            const last = ttsQueueRef.current.at(-1);
+            if (last === text) return; // evita duplicado inmediato
+            ttsQueueRef.current.push(text);
+            processTTSQueue();
+        },
+        [processTTSQueue]
+    );
 
     // ÚNICO canal para hablar: cuando la IA manda {type:"say"}
-    const speak = (text: string, bubbleMs = 1400) => {
-        const clean = (text || "").trim();
-        if (!clean) return;
-        sayBubble(clean, bubbleMs);
-        enqueueTTS(clean);
-    };
-
-    useEffect(() => {
-        const onMute = () => { ttsEnabledRef.current = false; window.speechSynthesis.cancel(); };
-        const onUnmute = () => { ttsEnabledRef.current = true; };
-        const onToggle = () => {
-            ttsEnabledRef.current = !ttsEnabledRef.current;
-            if (!ttsEnabledRef.current) window.speechSynthesis.cancel();
-        };
-        const onSay = (e: Event) => {
-            const txt = (e as CustomEvent<string>).detail;
-            if (typeof txt === "string") speak(txt); // también respeta IA externa si lo usas
-        };
-
-        window.addEventListener("wingman:mute", onMute);
-        window.addEventListener("wingman:unmute", onUnmute);
-        window.addEventListener("wingman:toggle-voice", onToggle);
-        window.addEventListener("wingman:say", onSay);
-
-        return () => {
-            window.removeEventListener("wingman:mute", onMute);
-            window.removeEventListener("wingman:unmute", onUnmute);
-            window.removeEventListener("wingman:toggle-voice", onToggle);
-            window.removeEventListener("wingman:say", onSay);
-        };
-    }, []);
+    const speak = useCallback(
+        (text: string, bubbleMs = 1400) => {
+            const clean = (text || "").trim();
+            if (!clean) return;
+            sayBubble(clean, bubbleMs);
+            enqueueTTS(clean);
+        },
+        [enqueueTTS, sayBubble]
+    );
     // ====== FIN VOZ ======
 
     // visibilidad / viewport
     const pageVisibleRef = useRef(true);
     const onScreenRef = useRef(true);
     const aiEnabledRef = useRef(false);
-    const recomputeAIEnabled = () => {
+    const recomputeAIEnabled = useCallback(() => {
         aiEnabledRef.current = active && pageVisibleRef.current && onScreenRef.current;
-    };
+    }, [active]);
 
     // —— Utils —— 
-    const escortTarget = () => {
+    const escortTarget = useCallback(() => {
         const ang = (player.current.heading * Math.PI) / 180;
-        const cos = Math.cos(ang), sin = Math.sin(ang);
+        const cos = Math.cos(ang),
+            sin = Math.sin(ang);
 
         const ox = OFFSET_X * cos - OFFSET_Y * sin;
         const oy = OFFSET_X * sin + OFFSET_Y * cos;
 
         // filtros
-        const kOff = 0.16, kPl = 0.18;
+        const kOff = 0.16,
+            kPl = 0.18;
         escortOffsetFilt.current.x += (ox - escortOffsetFilt.current.x) * kOff;
         escortOffsetFilt.current.y += (oy - escortOffsetFilt.current.y) * kOff;
         playerFilt.current.x += (player.current.x - playerFilt.current.x) * kPl;
@@ -215,10 +221,11 @@ export default function Wingman() {
             x: playerFilt.current.x + escortOffsetFilt.current.x,
             y: playerFilt.current.y + escortOffsetFilt.current.y,
         };
-    };
+    }, []);
 
-    const fireOnce = (dirRad: number) => {
-        const dirx = Math.cos(dirRad), diry = Math.sin(dirRad);
+    const fireOnce = useCallback((dirRad: number) => {
+        const dirx = Math.cos(dirRad),
+            diry = Math.sin(dirRad);
         const base = pos.current;
         const nose = NOSE_OFFSET_PX + NOSE_FUDGE;
         const baseX = base.x + dirx * nose;
@@ -236,18 +243,20 @@ export default function Wingman() {
                 detail: { x: baseX, y: baseY, vx, vy, owner: "wingman", color: NPC_COLOR },
             })
         );
-    };
+    }, []);
 
     // ---- Helpers compartidos para IA ----
-    const normalize = (a: any) => {
-        if (!a) return null;
+    const normalize = (a: unknown): WingmanAction | null => {
+        if (!a || typeof a !== "object") return null;
+        const obj = a as Record<string, unknown>;
 
         // formato 1: { type: "say" | "move_to" | ... , ... }
-        if (a.type) return a;
+        if ("type" in obj) return obj as WingmanAction;
 
         // formato 2: { say: "text" }  ó { say: { text: "text" } }
-        if (a.say) {
-            const text = typeof a.say === "string" ? a.say : a.say?.text;
+        if ("say" in obj) {
+            const say = obj.say as string | { text: string };
+            const text = typeof say === "string" ? say : say?.text;
             if (typeof text === "string" && text.trim()) {
                 return { type: "say", text: text.trim() };
             }
@@ -255,64 +264,67 @@ export default function Wingman() {
         }
 
         // formato 3: { move_to: {...} }
-        if (a.move_to) return { type: "move_to", ...a.move_to };
+        if ("move_to" in obj) return { type: "move_to", ...(obj.move_to as { x: number; y: number }) };
 
         // formato 4: { fire_burst: {...} }
-        if (a.fire_burst) return { type: "fire_burst", ...a.fire_burst };
+        if ("fire_burst" in obj) return { type: "fire_burst", ...(obj.fire_burst as object) } as WingmanAction;
 
         // formato 5: { set_mode: {...} }
-        if (a.set_mode) return { type: "set_mode", ...a.set_mode };
+        if ("set_mode" in obj) return { type: "set_mode", ...(obj.set_mode as object) } as WingmanAction;
 
         // formato 6: { despawn: true }  ó { despawn: {} }
-        if (a.despawn) return { type: "despawn" };
+        if ("despawn" in obj) return { type: "despawn" };
 
         // formato 7: { engage: { move_to?, fire_burst? } }
-        if (a.engage?.move_to || a.engage?.fire_burst) return { type: "engage", ...a.engage };
+        if ("engage" in obj) return { type: "engage", ...(obj.engage as object) } as WingmanAction;
 
         return null;
     };
 
-    const applyActions = (actions: any[]) => {
-        for (const a of actions) {
-            if (!a) continue;
-            if (a.type === "set_mode") {
-                modeRef.current = a.mode;
-            } else if (a.type === "move_to") {
-                const now = performance.now();
-                if (now - lastMoveCmd.current < 600) continue;
-                lastMoveCmd.current = now;
+    const applyActions = useCallback(
+        (actions: WingmanAction[]) => {
+            for (const a of actions) {
+                if (!a) continue;
+                if (a.type === "set_mode") {
+                    modeRef.current = a.mode;
+                } else if (a.type === "move_to") {
+                    const now = performance.now();
+                    if (now - lastMoveCmd.current < 600) continue;
+                    lastMoveCmd.current = now;
 
-                let x = clamp(Number(a.x), 0, window.innerWidth);
-                let y = clamp(Number(a.y), 0, window.innerHeight);
-                const d = Math.hypot(x - pos.current.x, y - pos.current.y);
-                if (d < 24) continue;
-                if (d > 280) {
-                    const f = 280 / d;
-                    x = pos.current.x + (x - pos.current.x) * f;
-                    y = pos.current.y + (y - pos.current.y) * f;
+                    let x = clamp(Number(a.x), 0, window.innerWidth);
+                    let y = clamp(Number(a.y), 0, window.innerHeight);
+                    const d = Math.hypot(x - pos.current.x, y - pos.current.y);
+                    if (d < 24) continue;
+                    if (d > 280) {
+                        const f = 280 / d;
+                        x = pos.current.x + (x - pos.current.x) * f;
+                        y = pos.current.y + (y - pos.current.y) * f;
+                    }
+                    const cur = waypointRef.current ?? { x: pos.current.x, y: pos.current.y };
+                    waypointRef.current = { x: (cur.x + x) * 0.5, y: (cur.y + y) * 0.5 };
+                } else if (a.type === "fire_burst") {
+                    const cadence = clamp(Number(a.cadence_ms) || 160, 80, 400);
+                    const duration = clamp(Number(a.duration_ms) || 900, 200, 1800);
+                    const spread = Math.max(0, Math.min(0.08, Number(a.spread) ?? 0.02));
+                    burstRef.current = { endsAt: performance.now() + duration, cadence, lastShot: 0, spread };
+                } else if (a.type === "engage") {
+                    if (a.move_to) applyActions([{ type: "move_to", ...a.move_to }]);
+                    if (a.fire_burst) applyActions([{ type: "fire_burst", ...a.fire_burst }]);
+                } else if (a.type === "say") {
+                    if (a.text.trim()) speak(a.text.trim());
+                } else if (a.type === "despawn") {
+                    setActive(false);
+                    waypointRef.current = null;
+                    burstRef.current = null;
                 }
-                const cur = waypointRef.current ?? { x: pos.current.x, y: pos.current.y };
-                waypointRef.current = { x: (cur.x + x) * 0.5, y: (cur.y + y) * 0.5 };
-            } else if (a.type === "fire_burst") {
-                const cadence = clamp(Number(a.cadence_ms) || 160, 80, 400);
-                const duration = clamp(Number(a.duration_ms) || 900, 200, 1800);
-                const spread = Math.max(0, Math.min(0.08, Number(a.spread) ?? 0.02));
-                burstRef.current = { endsAt: performance.now() + duration, cadence, lastShot: 0, spread };
-            } else if (a.type === "engage") {
-                if (a.move_to) applyActions([{ type: "move_to", ...a.move_to }]);
-                if (a.fire_burst) applyActions([{ type: "fire_burst", ...a.fire_burst }]);
-            } else if (a.type === "say") {
-                if (typeof a.text === "string" && a.text.trim()) speak(a.text.trim());
-            } else if (a.type === "despawn") {
-                setActive(false);
-                waypointRef.current = null;
-                burstRef.current = null;
             }
-        }
-    };
+        },
+        [speak]
+    );
 
     // Decide 1 vez (para la activación)
-    const decideOnce = async () => {
+    const decideOnce = useCallback(async () => {
         try {
             const snapshot = {
                 time: Date.now(),
@@ -327,18 +339,18 @@ export default function Wingman() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(snapshot),
             });
-            const data = await res.json();
-            const actions = (data?.actions ?? []).map(normalize).filter(Boolean);
+            const data = (await res.json()) as { actions?: unknown[] };
+            const actions = (data?.actions ?? []).map(normalize).filter(Boolean) as WingmanAction[];
             applyActions(actions);
         } catch {
             /* silencioso */
         }
-    };
+    }, [applyActions]);
 
     // ======= Despedida vía IA cuando acaba la pelea (idle) =======
     const farewellPendingRef = useRef(false);
 
-    const farewellOnce = async () => {
+    const farewellOnce = useCallback(async () => {
         if (farewellPendingRef.current) return;
         farewellPendingRef.current = true;
 
@@ -351,7 +363,7 @@ export default function Wingman() {
                 enemies: collectDamageableTargets(),
                 // Prompt override: pedir SOLO una despedida breve en inglés
                 prompt:
-                    "Player is disengaging. Return EXACTLY ONE action: {\"type\":\"say\",\"text\":\"<short farewell, English, varied>\"}. 2–5 words.",
+                    'Player is disengaging. Return EXACTLY ONE action: {"type":"say","text":"<short farewell, English, varied>"}. 2–5 words.',
             };
 
             const res = await fetch("/api/wingman/decide", {
@@ -359,13 +371,12 @@ export default function Wingman() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(snapshot),
             });
-            const data = (await res.json()) as { actions?: any[] };
-            const actions = (data?.actions ?? []).map(normalize).filter(Boolean) as any[];
+            const data = (await res.json()) as { actions?: unknown[] };
+            const actions = (data?.actions ?? []).map(normalize).filter(Boolean) as WingmanAction[];
 
             // Forzamos a quedarnos solo con 'say' por seguridad
-            const sayOnly = actions.find((a) => a?.type === "say");
+            const sayOnly = actions.find((a) => a?.type === "say") as { type: "say"; text: string } | undefined;
             if (sayOnly?.text) speak(String(sayOnly.text), 1400);
-
         } catch {
             // (opcional) fallback ultra corto si la IA falla totalmente:
             // speak("Good hunting.", 1200);
@@ -378,13 +389,13 @@ export default function Wingman() {
                 farewellPendingRef.current = false;
             }, 1200);
         }
-    };
+    }, [speak]);
     // =============================================================
 
-    // —— Eventos (estado de la nave, disparo del player) ——
+    // —— Eventos (estado de la nave, disparo del player) —— 
     useEffect(() => {
         const onShipState = (e: Event) => {
-            const d = (e as CustomEvent<any>).detail;
+            const d = (e as CustomEvent<ShipStateDetail>).detail;
             if (!d) return;
             player.current = { ...player.current, ...d };
         };
@@ -398,7 +409,7 @@ export default function Wingman() {
 
             if (!active && shots.current.length >= SHOTS_TO_SPAWN) {
                 setActive(true);
-                warmupTTS();       // desbloquea voz
+                warmupTTS(); // desbloquea voz
                 void decideOnce(); // IA decide (incluye 'say' si quiere)
             }
         };
@@ -411,9 +422,9 @@ export default function Wingman() {
             window.removeEventListener("laser-fired", onPlayerShot);
             if (phraseTimeout.current) window.clearTimeout(phraseTimeout.current);
         };
-    }, [active]);
+    }, [active, decideOnce]);
 
-    // —— Eventos para prompt/voz desde la UI ——
+    // —— Eventos para prompt/voz desde la UI —— 
     useEffect(() => {
         const onSetPrompt = (e: Event) => {
             const txt = (e as CustomEvent<string>).detail;
@@ -429,7 +440,7 @@ export default function Wingman() {
             window.removeEventListener("wingman:set-prompt", onSetPrompt);
             window.removeEventListener("wingman:say", onSay);
         };
-    }, []);
+    }, [speak]);
 
     // Page Visibility → pausa IA cuando la pestaña está oculta
     useEffect(() => {
@@ -441,7 +452,7 @@ export default function Wingman() {
         document.addEventListener("visibilitychange", onVis);
         onVis();
         return () => document.removeEventListener("visibilitychange", onVis);
-    }, [active]);
+    }, [active, recomputeAIEnabled, processTTSQueue]);
 
     // IntersectionObserver del wingman → pausa IA si no está en viewport
     useEffect(() => {
@@ -449,7 +460,7 @@ export default function Wingman() {
         const el = wingRef.current;
         if (!el) return;
         const io = new IntersectionObserver(
-            entries => {
+            (entries) => {
                 onScreenRef.current = entries[0]?.isIntersecting ?? true;
                 recomputeAIEnabled();
             },
@@ -457,7 +468,7 @@ export default function Wingman() {
         );
         io.observe(el);
         return () => io.disconnect();
-    }, [active]);
+    }, [active, recomputeAIEnabled]);
 
     // —— Bucle físico/visual —— 
     useEffect(() => {
@@ -465,22 +476,21 @@ export default function Wingman() {
         let prev = performance.now();
         const HALF = NPC_SIZE / 2;
 
-        const MAX_SPEED = 520;     // px/s
-        const MAX_ACCEL = 1600;    // px/s^2
+        const MAX_SPEED = 520; // px/s
+        const MAX_ACCEL = 1600; // px/s^2
         const MAX_TURN_RATE = 360; // deg/s
-        const ANG_DEADBAND = 3;    // deg
+        const ANG_DEADBAND = 3; // deg
 
         const ARRIVE_START = 160;
         const ARRIVE_END = 36;
 
         const loop = () => {
             const now = performance.now();
-            const dt = Math.min(0.050, (now - prev) / 1000);
+            const dt = Math.min(0.05, (now - prev) / 1000);
             prev = now;
 
             // —— Inactividad: pedir despedida a la IA y luego despawn
             if (active && now - lastSeenPlayerShot.current > DESPAWN_AFTER_IDLE) {
-                // Evita repetidos
                 if (!farewellPendingRef.current) {
                     farewellOnce(); // IA elige la frase de despedida
                 }
@@ -541,8 +551,7 @@ export default function Wingman() {
             // pintar
             const el = wingRef.current;
             if (el) {
-                el.style.transform =
-                    `translate3d(${pos.current.x - HALF}px, ${pos.current.y - HALF}px, 0) rotate(${headingVisualDeg.current}deg)`;
+                el.style.transform = `translate3d(${pos.current.x - HALF}px, ${pos.current.y - HALF}px, 0) rotate(${headingVisualDeg.current}deg)`;
             }
 
             // burst
@@ -565,7 +574,7 @@ export default function Wingman() {
 
         raf = requestAnimationFrame(loop);
         return () => cancelAnimationFrame(raf);
-    }, [active]);
+    }, [active, escortTarget, farewellOnce, fireOnce]);
 
     // “enemigos” (letras)
     const collectDamageableTargets = () => {
@@ -614,9 +623,9 @@ export default function Wingman() {
                     body: JSON.stringify(snapshot),
                     signal: abort.signal,
                 });
-                const data = (await res.json()) as { actions?: any[] };
+                const data = (await res.json()) as { actions?: unknown[] };
 
-                const actions = (data?.actions ?? []).map(normalize).filter(Boolean) as any[];
+                const actions = (data?.actions ?? []).map(normalize).filter(Boolean) as WingmanAction[];
                 applyActions(actions);
             } catch {
                 /* silencio */
@@ -637,8 +646,9 @@ export default function Wingman() {
         return () => {
             cancelled = true;
             if (timer) window.clearTimeout(timer);
+            lastAbortRef.current?.abort();
         };
-    }, [active]);
+    }, [active, applyActions, recomputeAIEnabled]);
 
     return (
         <>
@@ -650,7 +660,8 @@ export default function Wingman() {
                         position: "fixed",
                         width: NPC_SIZE,
                         height: NPC_SIZE,
-                        left: 0, top: 0,
+                        left: 0,
+                        top: 0,
                         transform: `translate3d(${pos.current.x - NPC_SIZE / 2}px, ${pos.current.y - NPC_SIZE / 2}px, 0) rotate(${headingVisualDeg.current}deg)`,
                         willChange: "transform",
                         transformOrigin: "50% 50%",
