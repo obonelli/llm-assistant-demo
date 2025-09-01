@@ -1,3 +1,4 @@
+// src/app/components/Assistant.tsx
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -108,7 +109,7 @@ export default function Assistant() {
             } else {
                 setError('No entendí. Prueba con “abre Juan” / “exporta María” o “abre reporte ventas”.');
             }
-        } catch (e) {
+        } catch {
             setError("Hubo un problema con la IA. Intenta de nuevo.");
         } finally {
             setLoading(false);
@@ -181,13 +182,8 @@ export default function Assistant() {
                                     }
                                     // Espacio asegurado si algún handler global lo bloquea
                                     if (e.key === " ") {
-                                        // si algún listener previo lo bloqueó, inyectamos el espacio
-                                        if (e.defaultPrevented) {
-                                            setQ((prev) => prev + " ");
-                                        }
-                                        // Evita burbujeo a listeners globales
+                                        if (e.defaultPrevented) setQ((prev) => prev + " ");
                                         e.stopPropagation();
-                                        // No prevenimos por defecto para no impedir el input normal
                                     }
                                 }}
                                 placeholder='Escribe lo que necesites… (ej. "exporta reporte ventas")'

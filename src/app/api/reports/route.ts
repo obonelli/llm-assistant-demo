@@ -27,7 +27,6 @@ export async function POST(req: NextRequest) {
     const to = body.to ? new Date(body.to + "T23:59:59") : null;
 
     const peopleMap = new Map(PEOPLE.map((p) => [p.id, p]));
-    const chosen = ids.length ? PEOPLE.filter((p) => ids.includes(p.id)) : PEOPLE;
 
     // Agregación
     type Row = {

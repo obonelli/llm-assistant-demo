@@ -1,18 +1,21 @@
+// src/app/components/AirportFooter.tsx (o donde lo tengas)
 "use client";
-import React, { useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
+
+/** Permite usar custom properties CSS con tipado seguro */
+type CSSVars = React.CSSProperties & Record<`--${string}`, string | number>;
 
 export default function AirportFooter() {
     const H = "clamp(200px, 26vh, 360px)";
-    const lights = Array.from({ length: 22 });
-
+    const lights = useMemo(() => Array.from({ length: 22 }), []);
     const [active, setActive] = useState(false);
 
     // Flechas
     const RIGHT_N = 16; // abajo → derecha
-    const LEFT_N = 16; // arriba ← izquierda
+    const LEFT_N = 16;  // arriba ← izquierda
 
     // ---- Proximidad para 2 hangares (lado izquierdo) ----
-    const hangarsRef = useRef<HTMLDivElement[]>([]);
+    const hangarsRef = useRef<Array<HTMLDivElement | null>>([]);
     const [near, setNear] = useState<boolean[]>([false, false]);
 
     const handleMove: React.MouseEventHandler<HTMLDivElement> = (e) => {
@@ -42,7 +45,7 @@ export default function AirportFooter() {
 
             <footer
                 className="airport-footer"
-                style={{ ["--airport-h" as any]: H } as React.CSSProperties}
+                style={{ "--airport-h": H } as CSSVars}
                 aria-hidden={false}
             >
                 <div className="airport-glow" />
@@ -61,7 +64,10 @@ export default function AirportFooter() {
                     <div
                         className="runway-inset"
                         onMouseEnter={() => setActive(true)}
-                        onMouseLeave={() => { setActive(false); clearNear(); }}
+                        onMouseLeave={() => {
+                            setActive(false);
+                            clearNear();
+                        }}
                         onMouseMove={handleMove}
                     >
                         {/* Línea central */}
@@ -69,10 +75,14 @@ export default function AirportFooter() {
 
                         {/* Luces */}
                         <div className="edge edge-left">
-                            {lights.map((_, i) => <span key={`L${i}`} className="edge-light" />)}
+                            {lights.map((_, i) => (
+                                <span key={`L${i}`} className="edge-light" />
+                            ))}
                         </div>
                         <div className="edge edge-right">
-                            {lights.map((_, i) => <span key={`R${i}`} className="edge-light" />)}
+                            {lights.map((_, i) => (
+                                <span key={`R${i}`} className="edge-light" />
+                            ))}
                         </div>
 
                         {/* SOLO 2 hangares al lado izquierdo */}
@@ -80,7 +90,9 @@ export default function AirportFooter() {
                             {Array.from({ length: 2 }).map((_, i) => (
                                 <div
                                     key={`HL${i}`}
-                                    ref={(el) => { if (el) hangarsRef.current[i] = el; }}
+                                    ref={(el) => {
+                                        hangarsRef.current[i] = el;
+                                    }}
                                     className={`hangar ${near[i] ? "is-near" : ""}`}
                                 />
                             ))}
@@ -89,7 +101,7 @@ export default function AirportFooter() {
                         {/* Flechas guía (derecha) */}
                         <div className="guidance guidance--right" aria-hidden>
                             {Array.from({ length: RIGHT_N }).map((_, i) => (
-                                <span key={i} className="arrow" style={{ ["--i" as any]: i }}>
+                                <span key={i} className="arrow" style={{ "--i": i } as CSSVars}>
                                     <svg width="22" height="12" viewBox="0 0 18 10" aria-hidden>
                                         <path d="M1 5 H13" stroke="#7CD8FF" strokeWidth="1.6" strokeLinecap="round" />
                                         <path d="M13 2 L17 5 L13 8" fill="none" stroke="#7CD8FF" strokeWidth="1.6" strokeLinecap="round" />
@@ -101,11 +113,15 @@ export default function AirportFooter() {
                         {/* Flechas guía (arriba, a la izquierda) */}
                         <div
                             className="guidance guidance--left"
-                            style={{ ["--n" as any]: LEFT_N } as React.CSSProperties}
+                            style={{ "--n": LEFT_N } as CSSVars}
                             aria-hidden
                         >
                             {Array.from({ length: LEFT_N }).map((_, i) => (
-                                <span key={i} className="arrow arrow--left" style={{ ["--i" as any]: i }}>
+                                <span
+                                    key={i}
+                                    className="arrow arrow--left"
+                                    style={{ "--i": i } as CSSVars}
+                                >
                                     <svg width="22" height="12" viewBox="0 0 18 10" aria-hidden>
                                         <path d="M1 5 H13" stroke="#7CD8FF" strokeWidth="1.6" strokeLinecap="round" />
                                         <path d="M13 2 L17 5 L13 8" fill="none" stroke="#7CD8FF" strokeWidth="1.6" strokeLinecap="round" />
