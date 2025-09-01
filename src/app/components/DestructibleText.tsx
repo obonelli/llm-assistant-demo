@@ -1,5 +1,6 @@
+// src/app/components/DestructibleText.tsx
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /** Ajustes “de juego” */
 const DAMAGE_RADIUS = 22;           // radio del impacto (px)
@@ -10,7 +11,6 @@ const SPARKS_PER_HIT = 26;          // chispas por impacto base
 const SHARDS_PER_HIT = 8;           // fragmentos (triángulos) por impacto base
 const SPARK_COLOR_CORE = "rgba(24,200,255,1)";
 const SPARK_COLOR_GLOW = "rgba(124,219,255,0.6)";
-const TEXT_GLOW = "0 0 22px rgba(25,200,255,.35)";
 const TEXT_FILL = "#fff";
 
 /** Partículas muy simples */
@@ -19,6 +19,10 @@ type P = {
     vx: number; vy: number;
     life: number; max: number;
     r: number; tri?: boolean; rot?: number; vr?: number;
+};
+
+type LaserLineDetail = {
+    x1: number; y1: number; x2: number; y2: number; alpha?: number;
 };
 
 export default function DestructibleText({
@@ -42,7 +46,7 @@ export default function DestructibleText({
     });
 
     // util
-    const fitText = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+    const fitText = useCallback((ctx: CanvasRenderingContext2D, w: number, h: number) => {
         const padX = 24;
         let size = 240; // empieza grande y baja
         ctx.textBaseline = "top";
@@ -57,13 +61,13 @@ export default function DestructibleText({
         }
         fontRef.current.size = size;
         ctx.font = `${fontRef.current.weight} ${size}px ${fontRef.current.family}`;
-    };
+    }, [text]);
 
-    const drawBaseText = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+    const drawBaseText = useCallback((ctx: CanvasRenderingContext2D, w: number, h: number) => {
         ctx.clearRect(0, 0, w, h);
         ctx.save();
         ctx.shadowBlur = 18;
-        (ctx as any).shadowColor = "rgba(0,0,0,.35)";
+        ctx.shadowColor = "rgba(0,0,0,.35)";
         ctx.fillStyle = TEXT_FILL;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -77,11 +81,11 @@ export default function DestructibleText({
         ctx.save();
         ctx.globalCompositeOperation = "lighter";
         ctx.shadowBlur = 26;
-        (ctx as any).shadowColor = "rgba(124,219,255,.28)";
+        ctx.shadowColor = "rgba(124,219,255,.28)";
         ctx.fillStyle = "rgba(255,255,255,.08)";
         ctx.fillText(text, cx, cy);
         ctx.restore();
-    };
+    }, [text]);
 
     const makeSplat = (mx: number, my: number, strength = DAMAGE_STRENGTH) => {
         const mask = maskRef.current!;
@@ -127,8 +131,8 @@ export default function DestructibleText({
 
     /** recibe trazos de láser y aplica daño si pasan sobre el canvas */
     useEffect(() => {
-        const onLaser = (e: Event) => {
-            const { x1, y1, x2, y2, alpha } = (e as CustomEvent).detail || {};
+        const onLaser = (e: CustomEvent<LaserLineDetail>) => {
+            const { x1, y1, x2, y2, alpha } = e.detail || {};
             const wrap = wrapRef.current!;
             const rect = wrap.getBoundingClientRect();
             // recorte rápido
@@ -150,8 +154,10 @@ export default function DestructibleText({
                 if (i % 3 === 0) spawnSparks(lx, ly, 8, big);
             }
         };
-        window.addEventListener("laser-line", onLaser as EventListener);
-        return () => window.removeEventListener("laser-line", onLaser as EventListener);
+        // TS no conoce el tipo del CustomEvent; casteamos solo en add/remove
+        const asListener: EventListener = (e) => onLaser(e as CustomEvent<LaserLineDetail>);
+        window.addEventListener("laser-line", asListener);
+        return () => window.removeEventListener("laser-line", asListener);
     }, []);
 
     /** layout + render principal */
@@ -219,7 +225,7 @@ export default function DestructibleText({
                 const t = p.life / p.max;
                 if (t >= 1) { particles.current.splice(i, 1); continue; }
                 // física simple
-                p.vy += 620 * dt;           // gravedad
+                p.vy += 620 * dt;                 // gravedad
                 p.vx *= Math.pow(0.985, dt * 60); // leve rozamiento
                 p.vy *= Math.pow(0.985, dt * 60);
                 p.x += p.vx * dt;
@@ -268,7 +274,7 @@ export default function DestructibleText({
 
         setReady(true);
         return () => { cancelAnimationFrame(raf); ro.disconnect(); };
-    }, [text]);
+    }, [text, fitText, drawBaseText]);
 
     return (
         <div ref={wrapRef} className={`destructible-wrap ${ready ? "is-ready" : ""} ${className}`}>

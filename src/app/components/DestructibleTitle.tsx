@@ -1,3 +1,4 @@
+// ./src/app/components/DestructibleTitle.tsx
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
@@ -9,6 +10,9 @@ const RESPAWN_TIME_MS = 1400;           // curación mínima (d→0)
 const RESPAWN_TIME_JITTER_MS = 400;     // +0..400ms extra por letra
 
 type Props = { text: string; className?: string };
+
+/** Permite pasar CSS custom properties sin usar `any` */
+type CSSVars = React.CSSProperties & { [key: `--${string}`]: string | number };
 
 export default function DestructibleTitle({ text, className }: Props) {
     const rootRef = useRef<HTMLHeadingElement | null>(null);
@@ -26,7 +30,9 @@ export default function DestructibleTitle({ text, className }: Props) {
         const root = rootRef.current;
         if (!root) return;
 
-        const letters = Array.from(root.querySelectorAll<HTMLSpanElement>(".damageable-letter"));
+        const letters = Array.from(
+            root.querySelectorAll<HTMLSpanElement>(".damageable-letter")
+        );
 
         // Semillas/umbrales + jitter por letra
         for (let i = 0; i < letters.length; i++) {
@@ -39,8 +45,12 @@ export default function DestructibleTitle({ text, className }: Props) {
             const fallThreshold = 0.66 + r() * 0.2;
             const delay = r() * 140;
 
-            const respawnDelay = Math.round(RESPAWN_DELAY_MS + r() * RESPAWN_DELAY_JITTER_MS);
-            const respawnTime = Math.round(RESPAWN_TIME_MS + r() * RESPAWN_TIME_JITTER_MS);
+            const respawnDelay = Math.round(
+                RESPAWN_DELAY_MS + r() * RESPAWN_DELAY_JITTER_MS
+            );
+            const respawnTime = Math.round(
+                RESPAWN_TIME_MS + r() * RESPAWN_TIME_JITTER_MS
+            );
 
             span.style.setProperty("--sx", String(drift * dir));
             span.style.setProperty("--rotF", String(rot));
@@ -54,7 +64,7 @@ export default function DestructibleTitle({ text, className }: Props) {
 
         // Flash + jitter al impacto (lo dispara LaserLayer)
         const onLetterHit = (e: Event) => {
-            const { el } = (e as CustomEvent).detail || {};
+            const { el } = (e as CustomEvent<{ el: unknown }>).detail || {};
             if (!(el instanceof HTMLElement)) return;
             if (!el.classList.contains("damageable-letter")) return;
             el.classList.add("hit");
@@ -68,7 +78,8 @@ export default function DestructibleTitle({ text, className }: Props) {
             for (const span of letters) {
                 if (span.dataset.fallen === "1") continue;
                 const th = Number(span.dataset.fallThreshold || "0.8");
-                const d = parseFloat(getComputedStyle(span).getPropertyValue("--d") || "0") || 0;
+                const d =
+                    parseFloat(getComputedStyle(span).getPropertyValue("--d") || "0") || 0;
                 if (d >= th) {
                     span.classList.add("fall");
                     span.dataset.fallen = "1";
@@ -88,7 +99,10 @@ export default function DestructibleTitle({ text, className }: Props) {
                 if (t.dataset.respawning !== "1") {
                     t.dataset.respawning = "1";
                     const delay = Number(t.dataset.respawnDelay || RESPAWN_DELAY_MS);
-                    window.setTimeout(() => healInvisibleAndShow(t as HTMLSpanElement), delay);
+                    window.setTimeout(
+                        () => healInvisibleAndShow(t as HTMLSpanElement),
+                        delay
+                    );
                 }
             }
         };
@@ -101,7 +115,8 @@ export default function DestructibleTitle({ text, className }: Props) {
             span.classList.remove("fall", "respawning");
 
             const start = performance.now();
-            const startD = parseFloat(getComputedStyle(span).getPropertyValue("--d") || "1") || 1;
+            const startD =
+                parseFloat(getComputedStyle(span).getPropertyValue("--d") || "1") || 1;
             const dur = Number(span.dataset.respawnTime || RESPAWN_TIME_MS);
 
             const heal = (ts: number) => {
@@ -140,6 +155,9 @@ export default function DestructibleTitle({ text, className }: Props) {
         };
     }, []);
 
+    // Estilo base para inicializar la variable CSS --d
+    const letterBaseStyle: CSSVars = { "--d": 0 };
+
     return (
         <h1 ref={rootRef} className={`destructible-wrap ${className ?? ""}`}>
             {nodes.map((n, idx) =>
@@ -151,7 +169,7 @@ export default function DestructibleTitle({ text, className }: Props) {
                         className="damageable-letter"
                         data-damageable="true"
                         data-idx={idx}
-                        style={{ ["--d" as any]: 0 }}
+                        style={letterBaseStyle}
                     >
                         {n.ch}
                     </span>
@@ -164,7 +182,7 @@ export default function DestructibleTitle({ text, className }: Props) {
 /** PRNG simple */
 function rng(seed: number) {
     return function () {
-        let t = (seed += 0x6D2B79F5);
+        let t = (seed += 0x6d2b79f5);
         t = Math.imul(t ^ (t >>> 15), t | 1);
         t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
         return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
