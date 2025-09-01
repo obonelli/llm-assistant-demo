@@ -1,3 +1,4 @@
+// src/app/components/cursor/useShipController.ts
 "use client";
 import { useEffect, useRef } from "react";
 import {
@@ -206,10 +207,10 @@ export function useShipController(shipRef: React.RefObject<HTMLDivElement>) {
                 const washScale = clamp(0.95 + speed.current * 0.0018, 0.95, 1.28);
                 const washAlpha = clamp(0.20 + speed.current * 0.00045, 0.20, 0.36);
                 const washBack = clamp(10 + speed.current * 0.015, 10, 36);
-                (el.style as any).setProperty?.("--wash-scale", String(washScale));
-                (el.style as any).setProperty?.("--wash-alpha", String(washAlpha));
-                (el.style as any).setProperty?.("--wash-offset", `${-washBack}px`);
-                (el.style as any).setProperty?.("--wash-rot", `${headingRender}deg`);
+                el.style.setProperty("--wash-scale", String(washScale));
+                el.style.setProperty("--wash-alpha", String(washAlpha));
+                el.style.setProperty("--wash-offset", `${-washBack}px`);
+                el.style.setProperty("--wash-rot", `${headingRender}deg`);
 
                 const fly = el.querySelector<SVGElement>(".ship-fly");
                 const land = el.querySelector<SVGElement>(".ship-land");
@@ -223,8 +224,8 @@ export function useShipController(shipRef: React.RefObject<HTMLDivElement>) {
                     }
                     fly.style.transformStyle = "preserve-3d";
                     land.style.transformStyle = "preserve-3d";
-                    (fly.style as any).backfaceVisibility = "hidden";
-                    (land.style as any).backfaceVisibility = "hidden";
+                    fly.style.backfaceVisibility = "hidden";
+                    land.style.backfaceVisibility = "hidden";
                 }
             }
 
@@ -249,7 +250,8 @@ export function useShipController(shipRef: React.RefObject<HTMLDivElement>) {
             ro.disconnect();
             document.body.classList.remove("cursor-none");
         };
-    }, []);
+        // incluye shipRef para satisfacer exhaustive-deps (su identidad es estable)
+    }, [shipRef]);
 
     return {
         pos, speed, shipVel, headingRenderRef, liftRef,

@@ -1,3 +1,4 @@
+// src/app/components/cursor/LaserLayer.tsx
 "use client";
 import { useEffect, useRef } from "react";
 import {
@@ -13,8 +14,8 @@ import { DamageTarget, Flash, Laser, Spark, Frag } from "./types";
 
 // === Colores ===
 const PLAYER_GLOW_RGB = { r: 124, g: 219, b: 255 };  // cian suave
-const PLAYER_CORE_RGB = { r: 24, g: 200, b: 255 };  // cian intenso
-const NPC_CORE_HEX = "#ff7cf3";                       // morado wingman
+const PLAYER_CORE_RGB = { r: 24, g: 200, b: 255 };   // cian intenso
+const NPC_CORE_HEX = "#ff7cf3";                      // morado wingman
 const NPC_CORE_RGB = { r: 255, g: 124, b: 243 };
 const NPC_GLOW_RGB = { r: 255, g: 124, b: 243 };
 
@@ -24,7 +25,7 @@ const rgba = (rgb: { r: number; g: number; b: number }, a: number) =>
 
 // Extendemos tipos para incluir color y origen
 type LaserEx = Laser & { color?: string; from?: "player" | "wingman" };
-type FlashEx = Flash & { color: string };
+type FlashEx = Flash & { color: "player" | "wingman" };
 
 type Props = {
     posRef: React.MutableRefObject<{ x: number; y: number }>;
@@ -181,19 +182,20 @@ export default function LaserLayer({
                     if (segIntersectsRect(tx, ty, l.x, l.y, r)) {
                         const hitX = clamp((l.x - r.left) / r.width, 0, 1);
                         const hitY = clamp((l.y - r.top) / r.height, 0, 1);
-                        const el = t.el;
+                        const el = t.el as HTMLElement;
 
                         const cur = parseFloat(getComputedStyle(el).getPropertyValue("--d") || "0") || 0;
                         const nd = Math.min(1, cur + DAMAGE_ADD_PER_HIT);
                         el.style.setProperty("--d", nd.toFixed(3));
                         el.style.setProperty("--hx", `${(hitX * 100).toFixed(2)}%`);
                         el.style.setProperty("--hy", `${(hitY * 100).toFixed(2)}%`);
-                        (el as any).dataset.lastHit = String(performance.now());
+                        el.dataset.lastHit = String(performance.now()); // ← sin any
 
                         window.dispatchEvent(new CustomEvent("letter-hit", { detail: { el } }));
 
-                        const nrmx = -(l.vx / Math.hypot(l.vx, l.vy));
-                        const nrmy = -(l.vy / Math.hypot(l.vx, l.vy));
+                        const speed = Math.hypot(l.vx, l.vy) || 1;
+                        const nrmx = -(l.vx / speed);
+                        const nrmy = -(l.vy / speed);
                         spawnHitParticles(sparks.current, frags.current, l.x, l.y, nrmx, nrmy);
                     }
                 }
@@ -224,7 +226,8 @@ export default function LaserLayer({
             window.removeEventListener("keydown", onKeyDown);
             window.removeEventListener("spawn-laser", spawnListener);
         };
-    }, []);
+        // incluir refs para cumplir exhaustive-deps; su identidad es estable
+    }, [damageTargetsRef, headingRenderRef, liftRef, posRef, shipVelRef]);
 
     return (
         <canvas
