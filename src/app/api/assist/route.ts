@@ -38,7 +38,7 @@ type PersonRow = {
     name: string;
     email: string;
     role: string;
-    company: string; // company name (matches COMPANIES.name)
+    company: string;
     debit?: number;
     credit?: number;
     balance?: number;
