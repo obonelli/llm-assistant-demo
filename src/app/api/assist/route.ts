@@ -8,31 +8,9 @@ import { COMPANIES } from "@/mock/companies";
 /* =============== Types =============== */
 type Action = { type: "SAY"; text: string };
 
-/* =============== Utils =============== */
-const norm = (s: string) =>
-    (s || "")
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^\p{L}\p{N}@.\s-]/gu, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-
-/* =============== Short-term memory (5 turns) =============== */
 type MemoryMetric = "credit" | "debit" | "balance";
 type MemoryTurn = { q: string; a: string; metric?: MemoryMetric; personId?: string };
-const HISTORY_LIMIT = 5;
-let chatHistory: MemoryTurn[] = [];
 
-function pushHistory(t: MemoryTurn) {
-    chatHistory.push(t);
-    if (chatHistory.length > HISTORY_LIMIT) chatHistory.shift();
-}
-function lastMetric(): MemoryMetric | undefined {
-    for (let i = chatHistory.length - 1; i >= 0; i--) if (chatHistory[i].metric) return chatHistory[i].metric;
-}
-
-/* =============== Data helpers =============== */
 type PersonRow = {
     id: string;
     name: string;
@@ -43,6 +21,7 @@ type PersonRow = {
     credit?: number;
     balance?: number;
 };
+
 type ActivityRow = {
     personId: string;
     date: string;
@@ -54,8 +33,60 @@ type ActivityRow = {
     category?: string;
     ref?: string;
 };
+
 type CompanyRow = (typeof COMPANIES)[number];
 
+type PeopleContextRow = Pick<
+    PersonRow,
+    "id" | "name" | "email" | "company" | "role" | "debit" | "credit" | "balance"
+>;
+type ActivityContextRow = {
+    personId: string;
+    personName: string;
+    date: string;
+    action: string;
+    notes?: string;
+    amount?: number;
+    kind?: "debit" | "credit";
+    account?: string;
+    category?: string;
+    ref?: string;
+};
+type CompanyContextRow = Pick<
+    CompanyRow,
+    "id" | "name" | "industry" | "city" | "country" | "employees" | "website"
+>;
+
+type UIContext = {
+    selection?: string;
+    path?: string;
+    pageTitle?: string;
+    [k: string]: unknown;
+};
+
+/* =============== Utils =============== */
+const norm = (s: string) =>
+    (s || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^\p{L}\p{N}@.\s-]/gu, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+/* =============== Short-term memory (5 turns) =============== */
+const HISTORY_LIMIT = 5;
+const chatHistory: MemoryTurn[] = [];
+
+function pushHistory(t: MemoryTurn) {
+    chatHistory.push(t);
+    if (chatHistory.length > HISTORY_LIMIT) chatHistory.shift();
+}
+function lastMetric(): MemoryMetric | undefined {
+    for (let i = chatHistory.length - 1; i >= 0; i--) if (chatHistory[i].metric) return chatHistory[i].metric;
+}
+
+/* =============== Data helpers =============== */
 async function getAllPeople(): Promise<PersonRow[]> {
     return PEOPLE as PersonRow[];
 }
@@ -103,9 +134,10 @@ function scorePerson(qRaw: string, p: PersonRow) {
     if (hay.includes(nq)) s += 3;
     return s;
 }
-async function peopleContextTopK(query: string, k = 60) {
+
+async function peopleContextTopK(query: string, k = 60): Promise<PeopleContextRow[]> {
     const all = await getPeopleWithTotals();
-    const mapRow = (p: PersonRow) => ({
+    const mapRow = (p: PersonRow): PeopleContextRow => ({
         id: p.id,
         name: p.name,
         email: p.email,
@@ -133,11 +165,12 @@ function scoreActivity(qRaw: string, a: ActivityRow, personLookup: Record<string
     if (hay.includes(q)) s += 3;
     return s;
 }
-async function activitiesContextTopK(query: string, k = 120) {
+
+async function activitiesContextTopK(query: string, k = 120): Promise<ActivityContextRow[]> {
     const personLookup: Record<string, string> = {};
     for (const p of PEOPLE as PersonRow[]) personLookup[p.id] = p.name;
     const all = (ACTIVITY as ActivityRow[]) ?? [];
-    const mapRow = (a: ActivityRow) => ({
+    const mapRow = (a: ActivityRow): ActivityContextRow => ({
         personId: a.personId,
         personName: personLookup[a.personId] ?? "",
         date: a.date,
@@ -169,9 +202,10 @@ function scoreCompany(qRaw: string, c: CompanyRow) {
     if (hay.includes(nq)) s += 3;
     return s;
 }
-async function companiesContextTopK(query: string, k = 60) {
+
+async function companiesContextTopK(query: string, k = 60): Promise<CompanyContextRow[]> {
     const all = COMPANIES;
-    const mapRow = (c: CompanyRow) => ({
+    const mapRow = (c: CompanyRow): CompanyContextRow => ({
         id: c.id,
         name: c.name,
         industry: c.industry,
@@ -189,13 +223,14 @@ async function companiesContextTopK(query: string, k = 60) {
 }
 
 /* ===== schemas ===== */
-function schemaFromRows(rows: Array<Record<string, any>>): string[] {
+// Simplificamos: recibimos filas como Array<Record<string, unknown>>
+function schemaFromRows(rows: Array<Record<string, unknown>>): string[] {
     const keys = new Set<string>();
     for (const r of rows || []) Object.keys(r || {}).forEach((k) => keys.add(k));
     return Array.from(keys).sort();
 }
 function peopleSchema(): string[] {
-    const rows = (PEOPLE as any[]) || [];
+    const rows = (PEOPLE as Array<Record<string, unknown>>) || [];
     const base = schemaFromRows(rows);
     ["debit", "credit", "balance"].forEach((k) => {
         if (!base.includes(k)) base.push(k);
@@ -203,10 +238,10 @@ function peopleSchema(): string[] {
     return base.sort();
 }
 function companiesSchema(): string[] {
-    return schemaFromRows((COMPANIES as any[]) || []);
+    return schemaFromRows((COMPANIES as Array<Record<string, unknown>>) || []);
 }
 function activitiesSchema(): string[] {
-    return schemaFromRows((ACTIVITY as any[]) || []);
+    return schemaFromRows((ACTIVITY as Array<Record<string, unknown>>) || []);
 }
 
 /* =============== LLM prompt (solo texto con razonamiento breve) =============== */
@@ -233,13 +268,13 @@ Comportamiento:
 /* Prompt con contexto FILTRADO por el query y con metadatos mínimos de contexto */
 function buildUserPrompt(
     query: string,
-    context: any,
-    peopleChunk: any[],
-    activitiesChunk: any[],
-    companiesChunk: any[],
+    context: UIContext,
+    peopleChunk: PeopleContextRow[],
+    activitiesChunk: ActivityContextRow[],
+    companiesChunk: CompanyContextRow[],
     history: MemoryTurn[]
 ) {
-    const selection = (context?.selection ?? "").slice(0, 400);
+    const selection = String(context?.selection ?? "").slice(0, 400);
     const path = String(context?.path ?? "");
     const pageTitle = String(context?.pageTitle ?? "");
     const historyLines = history.slice(-HISTORY_LIMIT).map((h) => `Q: ${h.q}\nA: ${h.a}`).join("\n");
@@ -248,7 +283,6 @@ function buildUserPrompt(
     const compSchema = companiesSchema();
     const actSchema = activitiesSchema();
 
-    // Mini “context kind” para que el modelo sepa qué vista parece activa (solo texto)
     const contextKind =
         path.includes("/companies") ? "companies" :
             path.includes("/people") ? "people" :
@@ -287,16 +321,21 @@ ${JSON.stringify(actSchema)}
 }
 
 /* =============== LLM decision (solo SAY) =============== */
-function coerceAction(a: any): { action: Action } {
-    // Fuerza a SAY aunque llegue algo raro.
-    const text =
-        (a && a.action && typeof a.action.text === "string" && a.action.text) ||
-        (typeof a?.text === "string" && a.text) ||
-        JSON.stringify(a || {});
-    return { action: { type: "SAY", text: String(text || "") } };
+function coerceAction(a: unknown): { action: Action } {
+    if (typeof a === "object" && a !== null) {
+        const obj = a as { action?: { type?: unknown; text?: unknown }; text?: unknown };
+        const textCandidate =
+            (obj.action && typeof obj.action.text === "string" && obj.action.text) ||
+            (typeof obj.text === "string" && obj.text) ||
+            null;
+        if (typeof textCandidate === "string") {
+            return { action: { type: "SAY", text: textCandidate } };
+        }
+    }
+    return { action: { type: "SAY", text: JSON.stringify(a ?? {}) } };
 }
 
-async function decideWithLLM(query: string, context: any): Promise<{ action: Action }> {
+async function decideWithLLM(query: string, context: UIContext): Promise<{ action: Action }> {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
         return { action: { type: "SAY", text: "Falta OPENAI_API_KEY en el servidor." } };
@@ -324,9 +363,9 @@ async function decideWithLLM(query: string, context: any): Promise<{ action: Act
         ],
     });
 
-    const content = resp.choices?.[0]?.message?.content || "{}";
+    const content = resp.choices?.[0]?.message?.content ?? "{}";
     try {
-        const parsed = JSON.parse(content);
+        const parsed: unknown = JSON.parse(content);
         return coerceAction(parsed);
     } catch {
         return { action: { type: "SAY", text: "No pude interpretar la respuesta del modelo." } };
@@ -335,15 +374,19 @@ async function decideWithLLM(query: string, context: any): Promise<{ action: Act
 
 /* =============== Route handler (texto únicamente) =============== */
 export async function POST(req: NextRequest) {
-    const body = (await req.json().catch(() => ({}))) as {
+    const raw = await req.json().catch(() => ({}));
+    const body = (typeof raw === "object" && raw !== null ? raw : {}) as {
         query?: string;
         mode?: "HINT" | "DECIDE";
-        context?: any;
+        context?: unknown;
     };
 
     const query = body?.query ?? "";
     const mode = body?.mode ?? "DECIDE";
-    const context = body?.context ?? {};
+    const context: UIContext =
+        (typeof body?.context === "object" && body?.context !== null
+            ? (body.context as Record<string, unknown>)
+            : {}) as UIContext;
 
     if (mode === "HINT") {
         const apiKey = process.env.OPENAI_API_KEY;
@@ -371,7 +414,7 @@ export async function POST(req: NextRequest) {
         });
         const content = hintResp.choices?.[0]?.message?.content || "";
         try {
-            const parsed = JSON.parse(content);
+            const parsed: unknown = JSON.parse(content);
             return NextResponse.json(coerceAction(parsed));
         } catch {
             return NextResponse.json<{ action: Action }>({ action: { type: "SAY", text: "Listo para ayudarte." } });
@@ -383,7 +426,7 @@ export async function POST(req: NextRequest) {
 
     // Guardar historia si es SAY (para continuidad)
     if (result?.action?.type === "SAY") {
-        const say = (result.action as any).text || "";
+        const say = result.action.text || "";
         pushHistory({ q: query, a: say, metric: lastMetric() });
     }
 

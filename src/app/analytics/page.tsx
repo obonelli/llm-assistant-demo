@@ -19,7 +19,7 @@ type Row = {
 
 type ActivityRow = {
     personId: string;
-    date: string;   // ISO yyyy-mm-dd
+    date: string; // ISO yyyy-mm-dd
     action: string;
     notes?: string;
     amount?: number;
@@ -34,28 +34,52 @@ function parseDate(s: string) {
     const m2 = s.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/);
     if (m2) return new Date(`${m2[3]}-${m2[2]}-${m2[1]}T00:00:00`);
 
-    const meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+    const meses = [
+        "enero",
+        "febrero",
+        "marzo",
+        "abril",
+        "mayo",
+        "junio",
+        "julio",
+        "agosto",
+        "septiembre",
+        "octubre",
+        "noviembre",
+        "diciembre",
+    ];
     const mm = meses.findIndex((m) => s.includes(m));
     const y = s.match(/\b(20\d{2})\b/);
-    if (mm >= 0 && y) return new Date(`${y[1]}-${String(mm + 1).padStart(2, "0")}-01T00:00:00`);
+    if (mm >= 0 && y)
+        return new Date(
+            `${y[1]}-${String(mm + 1).padStart(2, "0")}-01T00:00:00`
+        );
     return null;
 }
 
-function toISO(d: Date) { return d.toISOString().slice(0, 10); }
-
 function downloadCSV(filename: string, rows: Row[]) {
-    const headers = ["Person", "Count", "Debit", "Credit", "Balance", "FirstDate", "LastDate"];
+    const headers = [
+        "Person",
+        "Count",
+        "Debit",
+        "Credit",
+        "Balance",
+        "FirstDate",
+        "LastDate",
+    ];
     const lines = [
         headers.join(","),
-        ...rows.map(r => [
-            `"${r.person.replace(/"/g, '""')}"`,
-            r.count,
-            r.debit.toFixed(2),
-            r.credit.toFixed(2),
-            r.balance.toFixed(2),
-            r.firstDate ?? "",
-            r.lastDate ?? "",
-        ].join(","))
+        ...rows.map((r) =>
+            [
+                `"${r.person.replace(/"/g, '""')}"`,
+                r.count,
+                r.debit.toFixed(2),
+                r.credit.toFixed(2),
+                r.balance.toFixed(2),
+                r.firstDate ?? "",
+                r.lastDate ?? "",
+            ].join(",")
+        ),
     ].join("\n");
     const blob = new Blob([lines], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -67,7 +91,10 @@ function downloadCSV(filename: string, rows: Row[]) {
 }
 
 function normalize(s: string) {
-    return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return (s || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
 }
 
 export default function AnalyticsPage() {
@@ -99,8 +126,11 @@ export default function AnalyticsPage() {
         }
 
         // fechas: "entre X y Y" o “desde X hasta Y”
-        let from: Date | null = null, to: Date | null = null;
-        const mEntre = q.match(/\b(entre|desde)\s+([^\s]+(?:\s+\w+)?(?:\s+\d{4})?)\s+(y|hasta)\s+([^\s]+(?:\s+\w+)?(?:\s+\d{4})?)/);
+        let from: Date | null = null,
+            to: Date | null = null;
+        const mEntre = q.match(
+            /\b(entre|desde)\s+([^\s]+(?:\s+\w+)?(?:\s+\d{4})?)\s+(y|hasta)\s+([^\s]+(?:\s+\w+)?(?:\s+\d{4})?)/
+        );
         if (mEntre) {
             from = parseDate(mEntre[2]) || null;
             to = parseDate(mEntre[4]) || null;
@@ -133,24 +163,27 @@ export default function AnalyticsPage() {
 
         const grouped: Record<string, Row> = {};
 
-        const acts = (ACTIVITY as ActivityRow[]);
+        const acts = ACTIVITY as ActivityRow[];
         for (const a of acts) {
             const time = new Date(a.date + "T00:00:00").getTime();
             if (time < fromTime || time > toTime) continue;
 
-            if (parsed.personMatches.length && !parsed.personMatches.includes(a.personId)) continue;
+            if (parsed.personMatches.length && !parsed.personMatches.includes(a.personId))
+                continue;
 
             const key = a.personId;
-            const base = grouped[key] ?? {
-                personId: key,
-                person: peopleById[key] ?? key,
-                count: 0,
-                debit: 0,
-                credit: 0,
-                balance: 0,
-                firstDate: null,
-                lastDate: null,
-            };
+            const base =
+                grouped[key] ??
+                {
+                    personId: key,
+                    person: peopleById[key] ?? key,
+                    count: 0,
+                    debit: 0,
+                    credit: 0,
+                    balance: 0,
+                    firstDate: null,
+                    lastDate: null,
+                };
 
             base.count += 1;
 
@@ -173,7 +206,7 @@ export default function AnalyticsPage() {
         // balance = credit - debit + balance (si hubo actividades sin kind)
         for (const k of Object.keys(grouped)) {
             const r = grouped[k];
-            r.balance = (r.credit - r.debit) + r.balance;
+            r.balance = r.credit - r.debit + r.balance;
         }
 
         let arr = Object.values(grouped);
@@ -192,26 +225,33 @@ export default function AnalyticsPage() {
         <main className="max-w-5xl mx-auto px-6 py-10">
             <h1 className="text-2xl font-semibold mb-3">Analytics (demo IA)</h1>
             <p className="text-white/70 mb-6">
-                Escribe tu consulta en lenguaje natural (ej. <em>“top 5 deudores entre 2024-06-01 y 2024-07-31”</em>,
-                <em> “saldos de Juan Pérez en junio 2024”</em>, <em>“créditos por persona”</em>).
+                Escribe tu consulta en lenguaje natural (ej.{" "}
+                <em>“top 5 deudores entre 2024-06-01 y 2024-07-31”</em>,{" "}
+                <em>“saldos de Juan Pérez en junio 2024”</em>,{" "}
+                <em>“créditos por persona”</em>).
             </p>
 
             <div className="flex gap-2 mb-4">
                 <input
                     value={ask}
                     onChange={(e) => setAsk(e.target.value)}
-                    className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 outline-none
-                     placeholder-white/50 focus:border-white/20"
+                    className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 outline-none placeholder-white/50 focus:border-white/20"
                     placeholder="Ej: top 5 deudores entre 2024-06-01 y 2024-07-31"
                 />
                 <button
-                    onClick={() => {/* ya se recalcula con useMemo */ }}
+                    onClick={() => {
+                        /* recalcula solo con useMemo */
+                    }}
                     className="rounded-lg border border-white/10 bg-white/8 px-3 py-2 hover:bg-white/10"
-                >Run</button>
+                >
+                    Run
+                </button>
                 <button
                     onClick={() => downloadCSV("analytics.csv", rows)}
                     className="rounded-lg border border-white/10 bg-white/8 px-3 py-2 hover:bg-white/10"
-                >Download CSV</button>
+                >
+                    Download CSV
+                </button>
             </div>
 
             <div className="overflow-x-auto rounded-xl border border-white/10">
@@ -229,15 +269,25 @@ export default function AnalyticsPage() {
                     </thead>
                     <tbody>
                         {rows.length === 0 && (
-                            <tr><td className="px-3 py-4 text-white/60" colSpan={7}>Sin resultados para esta consulta.</td></tr>
+                            <tr>
+                                <td className="px-3 py-4 text-white/60" colSpan={7}>
+                                    Sin resultados para esta consulta.
+                                </td>
+                            </tr>
                         )}
-                        {rows.map(r => (
+                        {rows.map((r) => (
                             <tr key={r.personId} className="odd:bg-white/[.03]">
                                 <td className="px-3 py-2">{r.person}</td>
                                 <td className="px-3 py-2 text-right">{r.count}</td>
-                                <td className="px-3 py-2 text-right">{r.debit.toFixed(2)}</td>
-                                <td className="px-3 py-2 text-right">{r.credit.toFixed(2)}</td>
-                                <td className="px-3 py-2 text-right">{r.balance.toFixed(2)}</td>
+                                <td className="px-3 py-2 text-right">
+                                    {r.debit.toFixed(2)}
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                    {r.credit.toFixed(2)}
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                    {r.balance.toFixed(2)}
+                                </td>
                                 <td className="px-3 py-2">{r.firstDate ?? ""}</td>
                                 <td className="px-3 py-2">{r.lastDate ?? ""}</td>
                             </tr>
@@ -247,8 +297,9 @@ export default function AnalyticsPage() {
             </div>
 
             <p className="text-xs text-white/50 mt-3">
-                Tip: si a tus <code>ACTIVITY</code> les agregas <code>amount</code> y <code>kind</code> (debit/credit),
-                los totales usan esos montos. Si no, cada actividad cuenta como 1.
+                Tip: si a tus <code>ACTIVITY</code> les agregas <code>amount</code> y{" "}
+                <code>kind</code> (debit/credit), los totales usan esos montos. Si no,
+                cada actividad cuenta como 1.
             </p>
         </main>
     );
