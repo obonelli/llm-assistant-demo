@@ -15,7 +15,6 @@
   --color-crimson: #DF1B3F;
 
   --font-display: "Inter Tight", system-ui, sans-serif;
-  /* vars dinámicas de puntero */
   --mx: .5;
   --my: .5;
 }
