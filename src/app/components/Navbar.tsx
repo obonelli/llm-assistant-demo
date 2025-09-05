@@ -18,6 +18,16 @@ export default function Navbar() {
     const [open, setOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
+    // Detectar si es tablet/desktop (tailwind sm: >= 640px)
+    const [isTabletOrDesktop, setIsTabletOrDesktop] = useState<boolean>(true);
+    useEffect(() => {
+        const mq = window.matchMedia("(min-width: 640px)");
+        const set = () => setIsTabletOrDesktop(mq.matches);
+        set();
+        mq.addEventListener?.("change", set);
+        return () => mq.removeEventListener?.("change", set);
+    }, []);
+
     // cerrar dropdown al hacer click fuera
     useEffect(() => {
         function onClick(e: MouseEvent) {
@@ -88,13 +98,26 @@ export default function Navbar() {
                                 >
                                     Companies
                                 </Link>
-                                <Link
-                                    href="/landing"
-                                    className="block px-3 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white"
-                                    role="menuitem"
-                                >
-                                    Landing
-                                </Link>
+
+                                {/* Playground: solo tablet/desktop. En móvil aparece deshabilitado */}
+                                {isTabletOrDesktop ? (
+                                    <Link
+                                        href="/playground"
+                                        className="block px-3 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white"
+                                        role="menuitem"
+                                    >
+                                        Playground
+                                    </Link>
+                                ) : (
+                                    <div
+                                        role="menuitem"
+                                        aria-disabled="true"
+                                        title="Playground: disponible solo en tablet o desktop"
+                                        className="block px-3 py-2 text-sm text-white/50 cursor-not-allowed select-none"
+                                    >
+                                        Playground (desktop only)
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>

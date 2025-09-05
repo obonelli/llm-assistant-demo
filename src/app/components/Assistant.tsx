@@ -26,7 +26,7 @@ type UIStrings = {
 export default function Assistant() {
     const router = useRouter();
     const pathname = usePathname();
-    const isLanding = pathname === "/landing"; // 👈 solo calculamos; no retornamos aún
+    const isLanding = pathname === "/playground";
 
     const [open, setOpen] = useState(false);
     const [q, setQ] = useState("");
@@ -34,9 +34,6 @@ export default function Assistant() {
     const [hint, setHint] = useState<string>("");
     const [error, setError] = useState<string>("");
     const [loading, setLoading] = useState(false);
-
-    // solo botón Close (no backdrop). ESC sí cierra.
-    const DISMISS_BY_BACKDROP = false; // (aún no usado, pero lo conservo)
 
     const [ui, setUI] = useState<UIStrings>({
         openTitle: "Assistant (⌘K / Ctrl+K)",
