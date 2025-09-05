@@ -6,10 +6,9 @@ import QuickSwitch from "@/app/components/QuickSwitch";
 export default async function CompaniesPage({
     searchParams,
 }: {
-    // 👇 En Next 14/15 puede venir como Promise: hay que await
     searchParams: Promise<{ q?: string }>;
 }) {
-    const { q = "" } = await searchParams; // ✅ await
+    const { q = "" } = await searchParams;
     const terms =
         q.toLowerCase().trim() === ""
             ? []
@@ -30,6 +29,7 @@ export default async function CompaniesPage({
                     <h1 className="text-2xl font-semibold">Companies</h1>
                     <p className="text-sm text-white/60">Simple company list.</p>
                 </div>
+
                 <form className="flex gap-2" action="/companies">
                     <input
                         name="q"
@@ -40,6 +40,15 @@ export default async function CompaniesPage({
                     <button className="rounded-md bg-cyan-500/20 px-3 py-2 text-sm ring-1 ring-cyan-400/30 hover:bg-cyan-500/30">
                         Search
                     </button>
+                    {q ? (
+                        <Link
+                            href="/companies"
+                            className="rounded-md px-3 py-2 text-sm ring-1 ring-white/10 hover:bg-white/5"
+                            title="Reset filters"
+                        >
+                            Reset
+                        </Link>
+                    ) : null}
                 </form>
             </div>
 
@@ -79,7 +88,6 @@ export default async function CompaniesPage({
 
             <p className="mt-3 text-xs text-white/50">{companies.length} shown</p>
 
-            {/* Quick switcher */}
             <QuickSwitch />
         </main>
     );

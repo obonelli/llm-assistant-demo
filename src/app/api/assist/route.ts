@@ -1,11 +1,10 @@
-// src/app/api/assist/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { PEOPLE } from "@/mock/people";
 import { ACTIVITY } from "@/mock/activity";
 import { COMPANIES } from "@/mock/companies";
+import type { UIStrings } from "@/types/assistant";
 
-/* =============== Types =============== */
 type Action = { type: "SAY"; text: string };
 
 type MemoryMetric = "credit" | "debit" | "balance";
@@ -64,7 +63,6 @@ type UIContext = {
     [k: string]: unknown;
 };
 
-/* =============== Utils =============== */
 const norm = (s: string) =>
     (s || "")
         .toLowerCase()
@@ -91,7 +89,6 @@ async function getAllPeople(): Promise<PersonRow[]> {
     return PEOPLE as PersonRow[];
 }
 
-/* Aggregate debit/credit/balance from ACTIVITY when PEOPLE doesn't include totals */
 function totalsFromActivity(): Record<string, { debit: number; credit: number; balance: number }> {
     const agg: Record<string, { debit: number; credit: number }> = {};
     for (const a of (ACTIVITY as ActivityRow[]) || []) {
@@ -121,7 +118,7 @@ async function getPeopleWithTotals(): Promise<PersonRow[]> {
     return base.map((p) => ({ ...p, ...(totals[p.id] || { debit: 0, credit: 0, balance: 0 }) }));
 }
 
-/* ===== context chunks (ranking por query para señal al modelo) ===== */
+/* ===== context chunks (ranking) ===== */
 function scorePerson(qRaw: string, p: PersonRow) {
     const q = norm(qRaw);
     if (!q) return 0;
@@ -223,7 +220,6 @@ async function companiesContextTopK(query: string, k = 60): Promise<CompanyConte
 }
 
 /* ===== schemas ===== */
-// Simplificamos: recibimos filas como Array<Record<string, unknown>>
 function schemaFromRows(rows: Array<Record<string, unknown>>): string[] {
     const keys = new Set<string>();
     for (const r of rows || []) Object.keys(r || {}).forEach((k) => keys.add(k));
@@ -244,28 +240,76 @@ function activitiesSchema(): string[] {
     return schemaFromRows((ACTIVITY as Array<Record<string, unknown>>) || []);
 }
 
-/* =============== LLM prompt (solo texto con razonamiento breve) =============== */
-const SYSTEM_PROMPT = `
-Eres un asistente para una app tipo CRM.
-Devuelve **únicamente** JSON con esta forma exacta:
-{"action":{"type":"SAY","text":"..."}}   // máx. 1–3 frases, en español.
+/* =============== Tools context (precomputed facts) =============== */
+function fmt(parts: Intl.DateTimeFormatPart[]) {
+    const obj: any = {};
+    for (const p of parts) obj[p.type] = p.value;
+    const date = `${obj.year}-${obj.month}-${obj.day}`;
+    const time = `${obj.hour}:${obj.minute}:${obj.second}`;
+    return { date, time, iso: `${date}T${time}` };
+}
+function timeIn(zone: string) {
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: zone,
+        hour12: false,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+    }).formatToParts(now);
+    return { zone, ...fmt(parts) };
+}
+function buildToolsContext() {
+    return {
+        now_server_iso: new Date().toISOString(),
+        timezones: [
+            timeIn("UTC"),
+            timeIn("America/Mexico_City"),
+            timeIn("America/Monterrey"),
+            timeIn("America/Los_Angeles"),
+            timeIn("America/New_York"),
+        ],
+    };
+}
 
-Comportamiento:
-- Responde con lógica y sentido común. Explica brevemente el porqué cuando aporte valor
-  (p. ej., "porque en el catálogo aparece...").
-- Tolera errores ortográficos, Spanglish y ruido.
-- Basa tus respuestas SOLO en los catálogos provistos (people_catalog, activities_catalog, companies_catalog)
-  y en los *_schema. No inventes datos que no estén ahí.
-- Preguntas factuales (p. ej., "¿en cuál empresa está X?"): responde con el dato.
-- Preguntas abiertas o genéricas (p. ej., "¿algo más?"):
-    • Da 1–3 observaciones útiles según el contexto actual (ruta/tipo de catálogo),
-      como conteos aproximados, extremos (mayor/menor), outliers o patrones simples.
-    • Mantén precisión conservadora; si faltan datos, dilo.
-- Si piden columnas/campos/schema, lista los campos del *_schema en una sola frase.
-- No navegues, no des rutas, no devuelvas otra acción distinta a SAY.
+/* =============== Prompts =============== */
+const SYSTEM_PROMPT = `
+You are a helpful, concise assistant.
+Always return ONLY JSON: {"action":{"type":"SAY","text":"..."}} with 1–3 short sentences.
+Answer in the user's language; if uncertain, default to English.
+
+Use any generally known knowledge you have. When the user asks about CRM data (people/companies/activities),
+prefer the provided catalogs and *_schema. If a fact is not present, say so briefly.
+
+You may rely on the "tools_context" provided by the server (e.g., current time in various timezones).
+If tools_context contains a value relevant to the question (like local time), use it directly instead of guessing.
+
+Avoid unsafe content. No links unless explicitly present in context. Do not output any format other than the JSON above.
 `;
 
-/* Prompt con contexto FILTRADO por el query y con metadatos mínimos de contexto */
+const UI_SYSTEM_PROMPT = `
+You generate UI strings for a small assistant box.
+Return ONLY JSON: {
+  "ui":{
+    "openTitle": "...",
+    "openAria": "...",
+    "headerTitle": "...",
+    "headerBadge": "beta",
+    "placeholder": "...",
+    "ask": "...",
+    "close": "...",
+    "thinking": "...",
+    "errGeneric": "...",
+    "errDidntUnderstand": "..."
+  }
+}
+Default language is English, but if the user's current query is clearly in Spanish, return Spanish strings.
+Keep them short and friendly. No extra fields.
+`;
+
 function buildUserPrompt(
     query: string,
     context: UIContext,
@@ -288,25 +332,30 @@ function buildUserPrompt(
             path.includes("/people") ? "people" :
                 path.includes("/analytics") ? "analytics" : "unknown";
 
+    const tools_context = buildToolsContext();
+
     return `
-Historial reciente:
+Recent history:
 ${historyLines || "(empty)"}
 
-Consulta original: ${JSON.stringify(query)}
+Original query: ${JSON.stringify(query)}
 
-Contexto UI (solo referencia textual):
+UI context (text only):
 - path: ${JSON.stringify(path)}
 - context_kind: ${JSON.stringify(contextKind)}
 - title: ${JSON.stringify(pageTitle)}
 - selection: ${JSON.stringify(selection)}
 
-people_catalog (TOP-K por el query o generales si el query es vacío):
+tools_context (server precomputed facts you can rely on):
+${JSON.stringify(tools_context)}
+
+people_catalog (top-k for the query or general if empty):
 ${JSON.stringify(peopleChunk)}
 
-activities_catalog (TOP-K por el query o generales si el query es vacío):
+activities_catalog:
 ${JSON.stringify(activitiesChunk)}
 
-companies_catalog (TOP-K por el query o generales si el query es vacío):
+companies_catalog:
 ${JSON.stringify(companiesChunk)}
 
 people_schema:
@@ -320,7 +369,7 @@ ${JSON.stringify(actSchema)}
 `;
 }
 
-/* =============== LLM decision (solo SAY) =============== */
+/* =============== Helpers =============== */
 function coerceAction(a: unknown): { action: Action } {
     if (typeof a === "object" && a !== null) {
         const obj = a as { action?: { type?: unknown; text?: unknown }; text?: unknown };
@@ -335,10 +384,11 @@ function coerceAction(a: unknown): { action: Action } {
     return { action: { type: "SAY", text: JSON.stringify(a ?? {}) } };
 }
 
+/* =============== LLM calls =============== */
 async function decideWithLLM(query: string, context: UIContext): Promise<{ action: Action }> {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-        return { action: { type: "SAY", text: "Falta OPENAI_API_KEY en el servidor." } };
+        return { action: { type: "SAY", text: "OPENAI_API_KEY is missing on the server." } };
     }
 
     const client = new OpenAI({ apiKey });
@@ -356,10 +406,7 @@ async function decideWithLLM(query: string, context: UIContext): Promise<{ actio
         temperature: 0.25,
         messages: [
             { role: "system", content: SYSTEM_PROMPT },
-            {
-                role: "user",
-                content: buildUserPrompt(query, context, peopleChunk, activitiesChunk, companiesChunk, chatHistory),
-            },
+            { role: "user", content: buildUserPrompt(query, context, peopleChunk, activitiesChunk, companiesChunk, chatHistory) },
         ],
     });
 
@@ -368,16 +415,68 @@ async function decideWithLLM(query: string, context: UIContext): Promise<{ actio
         const parsed: unknown = JSON.parse(content);
         return coerceAction(parsed);
     } catch {
-        return { action: { type: "SAY", text: "No pude interpretar la respuesta del modelo." } };
+        return { action: { type: "SAY", text: "Could not parse model response." } };
     }
 }
 
-/* =============== Route handler (texto únicamente) =============== */
+async function uiStringsFor(query: string): Promise<{ ui: UIStrings }> {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+        return {
+            ui: {
+                openTitle: "Assistant (⌘K / Ctrl+K)",
+                openAria: "Open assistant",
+                headerTitle: "Assistant",
+                headerBadge: "beta",
+                placeholder: 'Type what you need… e.g. "open Juan" / "export sales report"',
+                ask: "Ask",
+                close: "Close",
+                thinking: "Thinking…",
+                errGeneric: "There was a problem with the AI. Try again.",
+                errDidntUnderstand:
+                    'I didn’t understand. Try “open Juan”, “export María”, or “open sales report”.',
+            },
+        };
+    }
+    const client = new OpenAI({ apiKey });
+    const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+    const resp = await client.chat.completions.create({
+        model,
+        response_format: { type: "json_object" },
+        temperature: 0.2,
+        messages: [
+            { role: "system", content: UI_SYSTEM_PROMPT },
+            { role: "user", content: query || "" },
+        ],
+    });
+    const content = resp.choices?.[0]?.message?.content || "{}";
+    try {
+        const parsed = JSON.parse(content) as { ui?: UIStrings };
+        if (parsed?.ui) return { ui: parsed.ui };
+    } catch { }
+    return {
+        ui: {
+            openTitle: "Assistant (⌘K / Ctrl+K)",
+            openAria: "Open assistant",
+            headerTitle: "Assistant",
+            headerBadge: "beta",
+            placeholder: 'Type what you need… e.g. "open Juan" / "export sales report"',
+            ask: "Ask",
+            close: "Close",
+            thinking: "Thinking…",
+            errGeneric: "There was a problem with the AI. Try again.",
+            errDidntUnderstand:
+                'I didn’t understand. Try “open Juan”, “export María”, or “open sales report”.',
+        },
+    };
+}
+
+/* =============== Route handler =============== */
 export async function POST(req: NextRequest) {
     const raw = await req.json().catch(() => ({}));
     const body = (typeof raw === "object" && raw !== null ? raw : {}) as {
         query?: string;
-        mode?: "HINT" | "DECIDE";
+        mode?: "HINT" | "DECIDE" | "UI";
         context?: unknown;
     };
 
@@ -388,11 +487,16 @@ export async function POST(req: NextRequest) {
             ? (body.context as Record<string, unknown>)
             : {}) as UIContext;
 
+    if (mode === "UI") {
+        const ui = await uiStringsFor(query);
+        return NextResponse.json(ui);
+    }
+
     if (mode === "HINT") {
         const apiKey = process.env.OPENAI_API_KEY;
         if (!apiKey) {
             return NextResponse.json<{ action: Action }>({
-                action: { type: "SAY", text: "Pídeme personas, empresas, actividades o un resumen breve." },
+                action: { type: "SAY", text: "Ready to help." },
             });
         }
         const client = new OpenAI({ apiKey });
@@ -404,27 +508,26 @@ export async function POST(req: NextRequest) {
             messages: [
                 {
                     role: "system",
-                    content: 'Devuelve SOLO {"action":{"type":"SAY","text":"..."}} (<=12 palabras, español).',
+                    content:
+                        'Return ONLY {"action":{"type":"SAY","text":"..."}} (<=12 words). Language should match the user query; default English.',
                 },
                 {
                     role: "user",
-                    content: "Frase breve para sugerir consultar personas/empresas/actividades o pedir un resumen.",
+                    content: "Short hint encouraging to ask about anything, or CRM data if relevant.",
                 },
             ],
         });
         const content = hintResp.choices?.[0]?.message?.content || "";
         try {
             const parsed: unknown = JSON.parse(content);
-            return NextResponse.json(coerceAction(parsed));
+            return NextResponse.json(parsed);
         } catch {
-            return NextResponse.json<{ action: Action }>({ action: { type: "SAY", text: "Listo para ayudarte." } });
+            return NextResponse.json<{ action: Action }>({ action: { type: "SAY", text: "Ready to help." } });
         }
     }
 
-    // SOLO lo decide el LLM; no hay navegación.
     const result = await decideWithLLM(query, context);
 
-    // Guardar historia si es SAY (para continuidad)
     if (result?.action?.type === "SAY") {
         const say = result.action.text || "";
         pushHistory({ q: query, a: say, metric: lastMetric() });
