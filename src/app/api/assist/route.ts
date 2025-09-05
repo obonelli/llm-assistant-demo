@@ -240,14 +240,19 @@ function activitiesSchema(): string[] {
     return schemaFromRows((ACTIVITY as Array<Record<string, unknown>>) || []);
 }
 
+type DatePartType = Intl.DateTimeFormatPart["type"];
+type PartMap = Partial<Record<DatePartType, string>>;
+
 /* =============== Tools context (precomputed facts) =============== */
 function fmt(parts: Intl.DateTimeFormatPart[]) {
-    const obj: any = {};
+    const obj: PartMap = {};
     for (const p of parts) obj[p.type] = p.value;
-    const date = `${obj.year}-${obj.month}-${obj.day}`;
-    const time = `${obj.hour}:${obj.minute}:${obj.second}`;
+
+    const date = `${obj.year ?? ""}-${obj.month ?? ""}-${obj.day ?? ""}`;
+    const time = `${obj.hour ?? ""}:${obj.minute ?? ""}:${obj.second ?? ""}`;
     return { date, time, iso: `${date}T${time}` };
 }
+
 function timeIn(zone: string) {
     const now = new Date();
     const parts = new Intl.DateTimeFormat("en-CA", {

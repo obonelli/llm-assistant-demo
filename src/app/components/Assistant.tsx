@@ -157,14 +157,21 @@ export default function Assistant() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ query: text, mode: "DECIDE", context }),
             });
-            const json = await r.json();
-            const action = (json?.action || {}) as Action;
 
-            if (action?.type === "NAVIGATE") {
+            type DecideResp = { action?: Action };
+            const json: DecideResp = await r.json();
+            const action = json.action;
+
+            if (!action) {
+                setError(ui.errDidntUnderstand);
+                return;
+            }
+
+            if (action.type === "NAVIGATE") {
                 setOpen(false);
                 router.push(action.path);
                 setTimeout(() => {
-                    const highlight = (action as any).highlight as string | undefined;
+                    const highlight = action.highlight;
                     if (highlight) {
                         const el = document.querySelector(highlight) as HTMLElement | null;
                         if (el) {
@@ -174,9 +181,9 @@ export default function Assistant() {
                         }
                     }
                 }, 450);
-            } else if (action?.type === "ASK_DISAMBIGUATION") {
-                setOptions((action as any).options || []);
-            } else if (action?.type === "SAY") {
+            } else if (action.type === "ASK_DISAMBIGUATION") {
+                setOptions(action.options ?? []);
+            } else if (action.type === "SAY") {
                 setHint(action.text);
             } else {
                 setError(ui.errDidntUnderstand);
@@ -188,7 +195,7 @@ export default function Assistant() {
         }
     };
 
-    // ⛔️ No renderizar nada en /landing, pero después de haber llamado hooks
+    // ⛔️ No renderizar nada en /playground, pero después de haber llamado hooks
     if (isLanding) return null;
 
     return (

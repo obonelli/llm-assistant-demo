@@ -32,9 +32,14 @@ export default function PeopleClient({ initialQ }: { initialQ: string }) {
     const toggleId = (id: string) =>
         setOpenIds((prev) => {
             const next = new Set(prev);
-            next.has(id) ? next.delete(id) : next.add(id);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
             return next;
         });
+
 
     return (
         <main className="mx-auto w-full max-w-6xl px-4 sm:px-6 pb-20">

@@ -1,11 +1,11 @@
 import PeopleClient from "./people.client";
 
-export default function PeoplePage({
+export default async function PeoplePage({
     searchParams,
 }: {
-    searchParams?: { q?: string };
+    searchParams: Promise<{ q?: string }>;
 }) {
-    const q = searchParams?.q ?? "";
+    const { q = "" } = await searchParams;
     return (
         <div className="mt-6 sm:mt-8">
             <PeopleClient initialQ={q} />

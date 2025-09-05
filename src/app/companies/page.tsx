@@ -1,11 +1,11 @@
 import CompaniesClient from "./companies.client";
 
-export default function CompaniesPage({
+export default async function CompaniesPage({
     searchParams,
 }: {
-    searchParams?: { q?: string };
+    searchParams: Promise<{ q?: string }>;
 }) {
-    const q = searchParams?.q ?? "";
+    const { q = "" } = await searchParams;
     return (
         <div className="mt-6 sm:mt-8">
             <CompaniesClient initialQ={q} />
