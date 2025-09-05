@@ -12,7 +12,7 @@ import { Suspense } from "react";
 
 const inter = Inter_Tight({ subsets: ["latin"], variable: "--font-display" });
 
-export const metadata = { title: "Obonelli.dev", description: "Next.js + cyberpunk UI" };
+export const metadata = { title: "LLM Platform", description: "Next.js + cyberpunk UI" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
