@@ -6,5 +6,9 @@ export default function PeoplePage({
     searchParams?: { q?: string };
 }) {
     const q = searchParams?.q ?? "";
-    return <PeopleClient initialQ={q} />;
+    return (
+        <div className="mt-6 sm:mt-8">
+            <PeopleClient initialQ={q} />
+        </div>
+    );
 }

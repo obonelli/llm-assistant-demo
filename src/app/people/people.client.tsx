@@ -83,31 +83,31 @@ export default function PeopleClient({ initialQ }: { initialQ: string }) {
             </div>
 
             {/* -------- Mobile: casilleros -------- */}
+            {/* -------- Mobile: casilleros -------- */}
             <ul className="sm:hidden space-y-3">
                 {people.map((p) => {
                     const open = openIds.has(p.id);
                     return (
-                        <li
-                            key={p.id}
-                            className="rounded-xl ring-1 ring-white/10 bg-white/[0.03]"
-                        >
+                        <li key={p.id} className="rounded-xl ring-1 ring-white/10 bg-white/[0.03]">
                             <button
                                 onClick={() => toggleId(p.id)}
-                                className="w-full p-3 flex items-center justify-between"
+                                className="w-full px-4 py-3 flex items-center gap-3"
                                 aria-expanded={open}
                                 aria-controls={`person-${p.id}-panel`}
                             >
-                                <div className="min-w-0">
-                                    <span className="font-medium text-white/90 truncate">
+                                {/* IZQUIERDA: ocupa todo y alinea a la izquierda */}
+                                <div className="min-w-0 flex-1 text-left">
+                                    <span className="block font-medium text-white/90 truncate">
                                         {p.name}
                                     </span>
                                     <div className="mt-1 text-xs text-white/60 truncate">
                                         {p.company} <span className="mx-1">·</span> {p.role}
                                     </div>
                                 </div>
+
+                                {/* Chevron a la derecha */}
                                 <svg
-                                    className={`h-4 w-4 transition-transform ${open ? "rotate-180" : "rotate-0"
-                                        }`}
+                                    className={`h-4 w-4 shrink-0 transition-transform ${open ? "rotate-180" : "rotate-0"}`}
                                     viewBox="0 0 20 20"
                                     fill="currentColor"
                                     aria-hidden="true"
@@ -126,7 +126,7 @@ export default function PeopleClient({ initialQ }: { initialQ: string }) {
                                     }`}
                             >
                                 <div className="overflow-hidden">
-                                    <div className="px-3 pb-3 pt-1 text-sm">
+                                    <div className="px-4 pb-3 pt-1 text-sm">
                                         <div className="text-xs text-white/50">Email</div>
                                         <div className="break-all text-white/80">{p.email}</div>
                                         <div className="mt-2 text-xs text-white/50">Role</div>

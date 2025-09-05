@@ -9,13 +9,16 @@ import WingmanPrompt from "@/app/components/WingmanPrompt";
 
 export default function LandingHero() {
     return (
-        <main className="relative min-h-screen bg-tech overflow-hidden isolate">
+        // 👉 ocupa exactamente el alto del viewport menos la navbar (sin scroll)
+        <main
+            className="relative bg-tech overflow-hidden isolate"
+            style={{ minHeight: "calc(100dvh - var(--nav-h))" }}
+        >
             <WingmanPrompt
                 prompt="Eres un copiloto táctico profesional. Habla poco, en español neutro,
         tono calmado y útil. Solo 'say' cuando aporte algo: máximo 1 frase corta."
             />
 
-            {/* Navbar viene del layout */}
             <PointerFX />
             <CursorShip />
             <Wingman />
@@ -31,9 +34,11 @@ export default function LandingHero() {
                             "radial-gradient(circle, rgba(25,200,255,.25), rgba(232,67,147,.16) 45%, rgba(124,58,237,.14) 70%, transparent 75%)",
                     }}
                 />
+
+                {/* título más corto + leading mayor para evitar cortes de descendentes */}
                 <DestructibleTitle
-                    text={"Build fast & elegant products"}
-                    className="text-balance text-5xl sm:text-7xl font-extrabold leading-tight tracking-tight"
+                    text={"Create modern apps with refined UI"}
+                    className="text-balance text-5xl sm:text-7xl font-extrabold leading-[1.12] sm:leading-[1.1] tracking-tight"
                 />
 
                 <p className="mt-5 text-white/70 max-w-2xl mx-auto">

@@ -1,7 +1,7 @@
 // src/app/components/Assistant.tsx
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 type Action =
@@ -24,6 +24,10 @@ type UIStrings = {
 };
 
 export default function Assistant() {
+    const router = useRouter();
+    const pathname = usePathname();
+    const isLanding = pathname === "/landing"; // 👈 solo calculamos; no retornamos aún
+
     const [open, setOpen] = useState(false);
     const [q, setQ] = useState("");
     const [options, setOptions] = useState<Array<{ label: string; path: string }>>([]);
@@ -32,7 +36,7 @@ export default function Assistant() {
     const [loading, setLoading] = useState(false);
 
     // solo botón Close (no backdrop). ESC sí cierra.
-    const DISMISS_BY_BACKDROP = false;
+    const DISMISS_BY_BACKDROP = false; // (aún no usado, pero lo conservo)
 
     const [ui, setUI] = useState<UIStrings>({
         openTitle: "Assistant (⌘K / Ctrl+K)",
@@ -48,7 +52,6 @@ export default function Assistant() {
             'I didn’t understand. Try “open Juan”, “export María”, or “open sales report”.',
     });
 
-    const router = useRouter();
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
     // ⌘K / Ctrl+K toggle y ESC para cerrar (sin dependencias dinámicas)
@@ -65,7 +68,7 @@ export default function Assistant() {
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
-    }, []); // 👈 siempre constante
+    }, []);
 
     // Open: focus + fetch UI/hint
     useEffect(() => {
@@ -188,6 +191,9 @@ export default function Assistant() {
         }
     };
 
+    // ⛔️ No renderizar nada en /landing, pero después de haber llamado hooks
+    if (isLanding) return null;
+
     return (
         <>
             {/* FAB — oculto cuando open === true */}
@@ -216,7 +222,6 @@ export default function Assistant() {
                     className="fixed inset-0 z-[90] bg-black/55"
                     aria-modal="true"
                     role="dialog"
-                // No backdrop click: no se cierra
                 >
                     {/* ===== Mobile bottom sheet ===== */}
                     <div className="sm:hidden fixed inset-x-0 bottom-0 z-[91]" onClick={(e) => e.stopPropagation()}>

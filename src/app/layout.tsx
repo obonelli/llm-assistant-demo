@@ -23,7 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Navbar />
           </Suspense>
         </div>
-        <div className="page-shell">{children}</div>
+        <div>{children}</div>
         <Assistant />
       </body>
     </html>

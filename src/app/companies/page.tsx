@@ -6,5 +6,9 @@ export default function CompaniesPage({
     searchParams?: { q?: string };
 }) {
     const q = searchParams?.q ?? "";
-    return <CompaniesClient initialQ={q} />;
+    return (
+        <div className="mt-6 sm:mt-8">
+            <CompaniesClient initialQ={q} />
+        </div>
+    );
 }

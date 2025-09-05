@@ -1,4 +1,4 @@
-// ./src/app/components/DestructibleTitle.tsx
+// src/app/components/DestructibleTitle.tsx
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
@@ -108,9 +108,7 @@ export default function DestructibleTitle({ text, className }: Props) {
         };
         root.addEventListener("animationend", onAnimEnd);
 
-        // 🔑 Curamos --d a 0 mientras sigue oculta (.gone). Solo la mostramos cuando termina.
         function healInvisibleAndShow(span: HTMLSpanElement) {
-            // Asegurarnos de que siga oculta durante la curación
             span.classList.add("gone");
             span.classList.remove("fall", "respawning");
 
@@ -128,14 +126,11 @@ export default function DestructibleTitle({ text, className }: Props) {
                 if (t < 1) {
                     requestAnimationFrame(heal);
                 } else {
-                    // 100% curada -> ahora sí la mostramos con la anim de respawn
                     span.style.setProperty("--d", "0");
                     span.dataset.fallen = "0";
                     span.dataset.respawning = "0";
-                    // Mostrar y animar entrada
                     span.classList.add("respawning");
                     span.classList.remove("gone");
-                    // Al terminar la anim, limpiar clase
                     const onEnd = (ev: AnimationEvent) => {
                         if (ev.animationName === "letter-respawn") {
                             span.classList.remove("respawning");
@@ -159,7 +154,12 @@ export default function DestructibleTitle({ text, className }: Props) {
     const letterBaseStyle: CSSVars = { "--d": 0 };
 
     return (
-        <h1 ref={rootRef} className={`destructible-wrap ${className ?? ""}`}>
+        <h1
+            ref={rootRef}
+            className={`destructible-wrap ${className ?? ""}`}
+            // Evita que se corten descendentes en títulos grandes animados
+            style={{ overflow: "visible" }}
+        >
             {nodes.map((n, idx) =>
                 n.isSpace ? (
                     <span key={n.key} className="space" aria-hidden="true" />

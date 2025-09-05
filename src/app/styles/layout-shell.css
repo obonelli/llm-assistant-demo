@@ -1,6 +1,8 @@
 /* src/app/styles/layout-shell.css */
 
-/* Altura del navbar */
+/* ===========================
+   Altura del navbar
+   =========================== */
 :root {
     --nav-h: 64px;
 }
@@ -11,7 +13,9 @@
     }
 }
 
-/* Wrapper sticky del navbar (sin borde para evitar “doble línea”) */
+/* ===========================
+   Wrapper sticky del navbar
+   =========================== */
 .app-navbar {
     position: sticky;
     top: 0;
@@ -20,12 +24,27 @@
     display: flex;
     align-items: center;
     backdrop-filter: blur(8px);
-    /* Fondo sutil sin borde */
-    background: linear-gradient(to bottom, rgba(11, 15, 20, .92), rgba(11, 15, 20, .78));
-    /* border-bottom: 1px solid rgba(255,255,255,.06);  <-- removido */
+    background: linear-gradient(to bottom,
+            rgba(11, 15, 20, .92),
+            rgba(11, 15, 20, .78));
 }
 
-/* Offset global del contenido */
+/* ===========================
+   Offset global del contenido
+   =========================== */
 .page-shell {
     padding-top: var(--nav-h);
 }
+
+/* ===========================
+   NOTA
+   ===========================
+   En el Landing no usamos overrides aquí.
+   El ajuste de altura ya se hace directamente
+   en el componente <LandingHero /> con:
+
+   style={{ minHeight: "calc(100dvh - var(--nav-h))" }}
+
+   Esto evita el scroll extra y mantiene
+   siempre visible la Navbar.
+*/
