@@ -13,6 +13,8 @@ This repository serves as a playground to explore UI integration with a Large La
 - 🌐 Ready-to-deploy configuration for Vercel.
 
 ---
+## 🚀 Demo
+[Click here to try the live demo](https://llmplatform.obonelli.dev/people)
 
 ## 📦 Installation
 
